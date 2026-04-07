@@ -1,51 +1,28 @@
-import { useState, useEffect } from 'react'
-import { auth, provider } from './firebase'
-import { signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { onAuthStateChanged } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
+import { auth, db } from './firebase'
+import Login from './pages/Login'
+import Onboarding from './pages/Onboarding'
+import Home from './pages/Home'
+import ProtectedRoute from './components/ProtectedRoute'
 import './App.css'
 
 function App() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser)
-      setLoading(false)
-    })
-    return unsubscribe
-  }, [])
-
-  const handleGoogleSignIn = async () => {
-    try {
-      await signInWithPopup(auth, provider)
-    } catch (error) {
-      console.error('Sign in error:', error)
-    }
-  }
-
-  const handleSignOut = async () => {
-    await signOut(auth)
-  }
-
-  if (loading) return <div className="loading">Loading...</div>
-
-  if (!user) return (
-    <div className="auth-screen">
-      <div className="auth-card">
-        <h1>threedailywins</h1>
-        <p>Track your daily physical, mental, and spiritual wins.</p>
-        <button className="google-btn" onClick={handleGoogleSignIn}>
-          Continue with Google
-        </button>
-      </div>
-    </div>
-  )
-
   return (
-    <div className="app">
-      <h1>Welcome, {user.displayName}</h1>
-      <button onClick={handleSignOut}>Sign out</button>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/home" element={
+          <ProtectedRoute>
+            <Home />
+          </ProtectedRoute>
+        } />
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
