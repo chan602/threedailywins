@@ -1,7 +1,25 @@
-import { auth, provider } from '../firebase'
-import { signInWithPopup } from 'firebase/auth'
+import { useEffect } from 'react'
+import { auth, provider, db } from '../firebase'
+import { signInWithPopup, onAuthStateChanged } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
+import { useNavigate } from 'react-router-dom'
 
 function Login() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
+      if (userDoc.exists()) {
+        navigate('/home')
+      } else {
+        navigate('/onboarding')
+      }
+    })
+    return unsubscribe
+  }, [navigate])
+
   const handleGoogleSignIn = async () => {
     try {
       await signInWithPopup(auth, provider)
