@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react'
 import { auth, db } from '../firebase'
 import { signOut } from 'firebase/auth'
 import {
-  doc, collection, onSnapshot,
-  setDoc, getDoc, getDocs,
-  query, orderBy, limit
+  doc, onSnapshot,
+  setDoc, getDoc,
 } from 'firebase/firestore'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -48,8 +47,13 @@ function Home() {
   const [tomorrowTasks, setTomorrowTasks] = useState([])
   const [weeklyTasks, setWeeklyTasks] = useState([])
   const [dailyRepeats, setDailyRepeats] = useState([])
-  const [newTask, setNewTask] = useState('')
   const [rolloverDone, setRolloverDone] = useState(false)
+
+  // ── SEPARATE INPUT STATE PER TAB ──────────────────────
+  const [todayInput, setTodayInput] = useState('')
+  const [tomorrowInput, setTomorrowInput] = useState('')
+  const [weeklyInput, setWeeklyInput] = useState('')
+  const [dailyInput, setDailyInput] = useState('')
 
   // ── FIREBASE REFS ─────────────────────────────────────
   const todayRef = doc(db, 'tasks', uid, 'today', 'data')
@@ -72,8 +76,7 @@ function Home() {
 
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1)
     const yStr = yesterday.toLocaleDateString('en-CA')
-    const yRef = doc(db, 'tasks', uid, 'today', 'data')
-    const ySnap = await getDoc(yRef)
+    const ySnap = await getDoc(todayRef)
 
     // Archive yesterday
     if (ySnap.exists() && (ySnap.data().tasks || []).length > 0) {
@@ -92,7 +95,7 @@ function Home() {
       .filter(t => !t.done)
       .map(t => ({ ...t, carried: true, carryCount: (t.carryCount || 0) + 1 }))
 
-    // Pull tomorrow queue
+    // Pull tomorrow queue (stored under today's date — was tomorrow yesterday)
     const tmrwSnap = await getDoc(doc(db, 'tasks', uid, 'tomorrow', today))
     const fromTmrw = tmrwSnap.exists()
       ? (tmrwSnap.data().tasks || []).map(t => ({ ...t, carried: false, carryCount: 0 }))
@@ -172,16 +175,29 @@ function Home() {
 
   // ── TASK OPERATIONS ───────────────────────────────────
   async function addTask() {
-    if (!newTask.trim()) return
-    const task = { id: uuidv4(), text: newTask.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
-    setNewTask('')
     if (activeTab === 'today') {
+      if (!todayInput.trim()) return
+      const task = { id: uuidv4(), text: todayInput.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
+      setTodayInput('')
       await setDoc(todayRef, { tasks: [...todayTasks, task], date: todayStr() })
     } else if (activeTab === 'tomorrow') {
+      if (!tomorrowInput.trim()) return
+      const task = { id: uuidv4(), text: tomorrowInput.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
+      setTomorrowInput('')
       await setDoc(tmrwRef, { tasks: [...tomorrowTasks, task], date: tomorrowStr() })
     } else if (activeTab === 'weekly') {
+      if (!weeklyInput.trim()) return
+      const task = { id: uuidv4(), text: weeklyInput.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
+      setWeeklyInput('')
       await setDoc(weekRef, { tasks: [...weeklyTasks, task], weekKey: weekKey() })
     }
+  }
+
+  async function addDailyRepeat() {
+    if (!dailyInput.trim()) return
+    const task = { id: uuidv4(), text: dailyInput.trim(), count: 0, createdAt: Date.now() }
+    setDailyInput('')
+    await setDoc(dailyRef, { tasks: [...dailyRepeats, task], weekKey: weekKey() })
   }
 
   async function toggleTask(type, id) {
@@ -207,6 +223,10 @@ function Home() {
     }
   }
 
+  async function deleteDailyRepeat(id) {
+    await setDoc(dailyRef, { tasks: dailyRepeats.filter(t => t.id !== id), weekKey: weekKey() })
+  }
+
   async function tapDailyRepeat(id) {
     const task = dailyRepeats.find(t => t.id === id)
     if (!task) return
@@ -229,19 +249,10 @@ function Home() {
     }
   }
 
-  async function addDailyRepeat() {
-    if (!newTask.trim()) return
-    const task = { id: uuidv4(), text: newTask.trim(), count: 0, createdAt: Date.now() }
-    setNewTask('')
-    await setDoc(dailyRef, { tasks: [...dailyRepeats, task], weekKey: weekKey() })
-  }
-
   // ── RENDER ────────────────────────────────────────────
   const doneTasks = todayTasks.filter(t => t.done).length
   const totalTasks = todayTasks.length
   const pct = totalTasks === 0 ? 0 : Math.round(doneTasks / totalTasks * 100)
-
-  const tabs = ['today', 'tomorrow', 'weekly']
 
   return (
     <div className="home">
@@ -261,7 +272,7 @@ function Home() {
 
       {/* TABS */}
       <div className="tab-bar">
-        {tabs.map(tab => (
+        {['today', 'tomorrow', 'weekly'].map(tab => (
           <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
@@ -271,9 +282,9 @@ function Home() {
       {/* CONTENT */}
       <div className="tab-content">
 
+        {/* ── TODAY ── */}
         {activeTab === 'today' && (
           <div>
-            {/* PROGRESS */}
             <div className="progress-row">
               <span className="progress-label">{doneTasks} of {totalTasks} tasks</span>
               <span className="progress-pct">{pct}%</span>
@@ -281,16 +292,16 @@ function Home() {
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${pct}%` }} />
             </div>
-
-            {/* ADD TASK */}
             <div className="add-row">
-              <input className="task-input" placeholder="Add task..." value={newTask}
-                onChange={e => setNewTask(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addTask()} />
+              <input
+                className="task-input"
+                placeholder="Add task..."
+                value={todayInput}
+                onChange={e => setTodayInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addTask()}
+              />
               <button className="add-btn" onClick={addTask}>+</button>
             </div>
-
-            {/* TASK LIST */}
             <div className="task-list">
               {todayTasks.length === 0 && <p className="empty-msg">No tasks yet</p>}
               {todayTasks.map((t, i) => (
@@ -309,12 +320,17 @@ function Home() {
           </div>
         )}
 
+        {/* ── TOMORROW ── */}
         {activeTab === 'tomorrow' && (
           <div>
             <div className="add-row">
-              <input className="task-input" placeholder="Queue for tomorrow..." value={newTask}
-                onChange={e => setNewTask(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addTask()} />
+              <input
+                className="task-input"
+                placeholder="Queue for tomorrow..."
+                value={tomorrowInput}
+                onChange={e => setTomorrowInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addTask()}
+              />
               <button className="add-btn" onClick={addTask}>+</button>
             </div>
             <div className="task-list">
@@ -331,16 +347,20 @@ function Home() {
           </div>
         )}
 
+        {/* ── WEEKLY ── */}
         {activeTab === 'weekly' && (
           <div>
             <p className="week-range">{weekRangeLabel()}</p>
 
-            {/* W TASKS */}
             <p className="section-label">Weekly goals</p>
             <div className="add-row">
-              <input className="task-input" placeholder="Add weekly goal..." value={newTask}
-                onChange={e => setNewTask(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addTask()} />
+              <input
+                className="task-input"
+                placeholder="Add weekly goal..."
+                value={weeklyInput}
+                onChange={e => setWeeklyInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addTask()}
+              />
               <button className="add-btn" onClick={addTask}>+</button>
             </div>
             <div className="task-list">
@@ -355,12 +375,15 @@ function Home() {
               ))}
             </div>
 
-            {/* D TASKS */}
             <p className="section-label" style={{ marginTop: '1.5rem' }}>Daily habits</p>
             <div className="add-row">
-              <input className="task-input" placeholder="Add daily habit..." value={newTask}
-                onChange={e => setNewTask(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addDailyRepeat()} />
+              <input
+                className="task-input"
+                placeholder="Add daily habit..."
+                value={dailyInput}
+                onChange={e => setDailyInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addDailyRepeat()}
+              />
               <button className="add-btn" onClick={addDailyRepeat}>+</button>
             </div>
             <div className="task-list">
@@ -375,7 +398,7 @@ function Home() {
                   <span className="d-count">{t.count || 0}/7</span>
                   <button className="tap-btn" onClick={() => tapDailyRepeat(t.id)}>+</button>
                   <button className="tap-btn minus" onClick={() => untapDailyRepeat(t.id)} disabled={(t.count || 0) === 0}>−</button>
-                  <button className="delete-btn" onClick={() => deleteTask('weekly', t.id)}>×</button>
+                  <button className="delete-btn" onClick={() => deleteDailyRepeat(t.id)}>×</button>
                 </div>
               ))}
             </div>
