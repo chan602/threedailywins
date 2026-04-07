@@ -413,3 +413,341 @@ body {
 }
 
 .tap-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── WINS EVAL PANEL ── */
+.wins-panel {
+  margin-top: 1.5rem;
+  border-top: 0.5px solid rgba(255,255,255,0.07);
+  padding-top: 1.25rem;
+}
+
+.wins-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.wins-panel-title {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(147,197,253,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.eval-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.eval-btn:hover:not(:disabled) { background: #1d4ed8; }
+.eval-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.eval-meta {
+  font-size: 0.72rem;
+  color: rgba(232,240,252,0.3);
+  margin-bottom: 0.75rem;
+  font-style: italic;
+}
+
+.eval-error {
+  font-size: 0.8rem;
+  color: #f87171;
+  margin-bottom: 0.75rem;
+}
+
+.win-row {
+  border: 0.5px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background: rgba(255,255,255,0.02);
+}
+
+.win-row.achieved { border-color: rgba(34,197,94,0.2); background: rgba(34,197,94,0.04); }
+.win-row.missed   { border-color: rgba(248,113,113,0.15); background: rgba(248,113,113,0.03); }
+.win-row.pending  { border-color: rgba(255,255,255,0.06); }
+
+.win-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.win-row-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #e8f0fc;
+}
+
+.win-row-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.win-status-pill {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+}
+.win-status-pill.achieved { background: rgba(34,197,94,0.15); color: rgba(34,197,94,0.9); }
+.win-status-pill.missed   { background: rgba(248,113,113,0.15); color: rgba(248,113,113,0.9); }
+.win-status-pill.pending  { background: rgba(255,255,255,0.06); color: rgba(232,240,252,0.4); }
+
+.override-btn {
+  background: none;
+  border: 0.5px solid rgba(255,255,255,0.15);
+  color: rgba(232,240,252,0.4);
+  border-radius: 4px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.override-btn:hover { border-color: rgba(255,255,255,0.3); color: rgba(232,240,252,0.7); }
+
+.win-reasoning {
+  font-size: 0.78rem;
+  color: rgba(232,240,252,0.4);
+  margin-top: 0.4rem;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* ── WIN BADGES (archive) ── */
+.win-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0.15rem 0.4rem;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+.win-badge.achieved { background: rgba(34,197,94,0.12); color: rgba(34,197,94,0.8); }
+.win-badge.missed   { background: rgba(248,113,113,0.1); color: rgba(248,113,113,0.7); }
+.win-badge.pending  { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.25); }
+.win-badge.xs { font-size: 0.6rem; padding: 0.1rem 0.3rem; }
+
+.win-badge-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* ── ARCHIVE ── */
+.archive-week-group {
+  margin-bottom: 0.75rem;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 0.5px solid rgba(255,255,255,0.08);
+}
+
+.archive-week-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #0f1923;
+  cursor: pointer;
+  gap: 8px;
+  user-select: none;
+}
+.archive-week-header:hover { background: #111e2e; }
+
+.archive-week-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.archive-week-title {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #e8f0fc;
+}
+
+.archive-week-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.archive-win-badges {
+  display: flex;
+  gap: 3px;
+}
+
+.archive-chevron {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.3);
+  transition: transform 0.2s;
+}
+.archive-chevron.open { transform: rotate(180deg); }
+
+.archive-week-body {
+  background: rgba(255,255,255,0.01);
+}
+
+.archive-week-summary {
+  padding: 0.75rem 1rem;
+  border-bottom: 0.5px solid rgba(255,255,255,0.06);
+}
+
+.archive-week-section { margin-bottom: 0.75rem; }
+.archive-week-section:last-child { margin-bottom: 0; }
+
+.archive-week-section-label {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: rgba(147,197,253,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.4rem;
+}
+
+.archive-d-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.35rem;
+}
+.archive-d-label { font-size: 0.8rem; color: rgba(232,240,252,0.6); flex: 1; }
+.archive-d-bar { width: 60px; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; flex-shrink: 0; }
+.archive-d-bar-fill { height: 100%; background: #2563eb; border-radius: 2px; }
+.archive-d-count { font-size: 0.7rem; color: rgba(255,255,255,0.3); min-width: 24px; }
+
+.archive-w-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.3rem;
+}
+.archive-w-row.done .archive-w-text { text-decoration: line-through; opacity: 0.4; }
+.archive-w-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+.archive-w-dot.done { background: #2563eb; border-color: #2563eb; }
+.archive-w-text { font-size: 0.8rem; color: rgba(232,240,252,0.65); }
+
+/* ── ARCHIVE DAY ── */
+.archive-day {
+  border-top: 0.5px solid rgba(255,255,255,0.05);
+}
+.archive-day.three-win { border-left: 2px solid rgba(34,197,94,0.4); }
+
+.archive-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  gap: 8px;
+  user-select: none;
+}
+.archive-day-header:hover { background: rgba(255,255,255,0.02); }
+
+.archive-day-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.archive-day-date {
+  font-size: 0.82rem;
+  color: rgba(232,240,252,0.7);
+}
+.archive-day-date.three-win { color: rgba(34,197,94,0.85); }
+
+.archive-day-meta {
+  font-size: 0.72rem;
+  color: rgba(232,240,252,0.3);
+}
+
+.archive-day-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.archive-day-body {
+  padding: 0.5rem 1rem 0.75rem 1.5rem;
+  background: rgba(255,255,255,0.01);
+}
+
+.archive-task {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0.25rem 0;
+}
+.archive-task.done .archive-task-text { text-decoration: line-through; opacity: 0.35; }
+
+.archive-task-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+.archive-task-dot.done { background: #2563eb; border-color: #2563eb; }
+
+.archive-win-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.archive-win-dot.win-dot-physical  { background: rgba(251,146,60,0.7); }
+.archive-win-dot.win-dot-mental    { background: rgba(147,197,253,0.7); }
+.archive-win-dot.win-dot-spiritual { background: rgba(167,139,250,0.7); }
+
+.archive-task-text {
+  font-size: 0.8rem;
+  color: rgba(232,240,252,0.65);
+  line-height: 1.4;
+}
+
+.archive-reasoning {
+  font-size: 0.75rem;
+  color: rgba(232,240,252,0.3);
+  font-style: italic;
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 0.5px solid rgba(255,255,255,0.06);
+  line-height: 1.5;
+}
+
+.archive-not-evaluated {
+  font-size: 0.75rem;
+  color: rgba(232,240,252,0.2);
+  font-style: italic;
+  margin-top: 0.5rem;
+}
+
+.three-wins-badge {
+  font-size: 0.62rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  background: rgba(34,197,94,0.12);
+  color: rgba(34,197,94,0.7);
+  font-weight: 500;
+  white-space: nowrap;
+}
