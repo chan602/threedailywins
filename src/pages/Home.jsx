@@ -8,6 +8,7 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 
 const WORKER_URL = 'https://anthropic-proxy.emailtonathan.workers.dev/'
+const WORKER_SECRET = '3w-app-2026-xk9m'  // ← same string as the worker
 
 // ── HELPERS ──────────────────────────────────────────────
 function todayStr() {
@@ -405,7 +406,9 @@ Respond ONLY with valid JSON, no other text:
     try {
       const response = await fetch(WORKER_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json',
+    'X-App-Secret': '3w-app-2026-xk9m'   // ← add this line
+    },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 400,
