@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { auth, db } from '../firebase'
-import { signOut } from 'firebase/auth'
+import { signOut, deleteUser } from 'firebase/auth'
 import {
   doc, onSnapshot,
-  setDoc, getDoc, collection, getDocs, query, orderBy
+  setDoc, getDoc, collection, getDocs, query, orderBy, deleteDoc, writeBatch
 } from 'firebase/firestore'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -81,6 +81,7 @@ function Home() {
   const uid = user?.uid
 
   const [activeTab, setActiveTab] = useState('today')
+  const [activeNav, setActiveNav] = useState('home')
   const [todayTasks, setTodayTasks] = useState([])
   const [tomorrowTasks, setTomorrowTasks] = useState([])
   const [weeklyTasks, setWeeklyTasks] = useState([])
@@ -113,6 +114,16 @@ function Home() {
   const [streak, setStreak] = useState({ current: 0, total: 0, best: 0 })
   const [streakPopupOpen, setStreakPopupOpen] = useState(false)
 
+  // Profile / settings state
+  const [editPhysical, setEditPhysical] = useState('')
+  const [editMental, setEditMental] = useState('')
+  const [editSpiritual, setEditSpiritual] = useState('')
+  const [defsSaved, setDefsSaved] = useState(false)
+  const [defsLoading, setDefsLoading] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+
   // ── FIREBASE REFS ─────────────────────────────────────
   const todayRef = doc(db, 'tasks', uid, 'today', 'data')
   const tmrwRef = doc(db, 'tasks', uid, 'tomorrow', tomorrowStr())
@@ -126,7 +137,13 @@ function Home() {
   useEffect(() => {
     if (!uid) return
     getDoc(doc(db, 'users', uid)).then(snap => {
-      if (snap.exists()) setUserProfile(snap.data())
+      if (snap.exists()) {
+        const data = snap.data()
+        setUserProfile(data)
+        setEditPhysical(data.winsDefinition?.physical || '')
+        setEditMental(data.winsDefinition?.mental || '')
+        setEditSpiritual(data.winsDefinition?.spiritual || '')
+      }
     })
   }, [uid])
 
@@ -255,10 +272,10 @@ function Home() {
 
   // ── LOAD ARCHIVE (when tab switches to archive) ───────
   useEffect(() => {
-    if (activeTab === 'archive' && uid) {
+    if (activeNav === 'archive' && uid) {
       loadArchive()
     }
-  }, [activeTab, uid])
+  }, [activeNav, uid])
 
   async function loadArchive() {
     setArchiveLoading(true)
@@ -502,6 +519,51 @@ Respond ONLY with valid JSON, no other text:
     // onSnapshot will update streak state automatically
   }
 
+  // ── PROFILE ACTIONS ──────────────────────────────────
+  async function saveWinDefinitions() {
+    if (!uid) return
+    setDefsLoading(true)
+    setDefsSaved(false)
+    const updated = {
+      ...userProfile,
+      winsDefinition: {
+        physical: editPhysical.trim() || userProfile?.winsDefinition?.physical || '',
+        mental: editMental.trim() || userProfile?.winsDefinition?.mental || '',
+        spiritual: editSpiritual.trim() || userProfile?.winsDefinition?.spiritual || '',
+      }
+    }
+    await setDoc(doc(db, 'users', uid), updated)
+    setUserProfile(updated)
+    setDefsLoading(false)
+    setDefsSaved(true)
+    setTimeout(() => setDefsSaved(false), 2500)
+  }
+
+  async function deleteAccount() {
+    if (!uid) return
+    setDeleteLoading(true)
+    setDeleteError('')
+    try {
+      // Delete all user subcollections we can reach
+      const batch = writeBatch(db)
+      // We delete the user doc — subcollections persist but are orphaned (clean up via Cloud Functions later)
+      batch.delete(doc(db, 'users', uid))
+      batch.delete(doc(db, 'streak', uid, 'data', 'current'))
+      await batch.commit()
+      // Delete Firebase Auth account
+      await deleteUser(auth.currentUser)
+      // Auth state change will redirect to login via ProtectedRoute
+    } catch (e) {
+      console.error('deleteAccount error:', e)
+      if (e.code === 'auth/requires-recent-login') {
+        setDeleteError('For security, please sign out and sign back in before deleting your account.')
+      } else {
+        setDeleteError('Something went wrong — please try again.')
+      }
+      setDeleteLoading(false)
+    }
+  }
+
   // ── ARCHIVE HELPERS ───────────────────────────────────
   function toggleDay(date) {
     setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }))
@@ -569,9 +631,8 @@ Respond ONLY with valid JSON, no other text:
       <div className="home-header">
         <div className="home-nav">
           <span className="home-logo">threedailywins</span>
-          <button className="signout-btn" onClick={() => signOut(auth)}>Sign out</button>
         </div>
-        <div className="home-stats">
+        {activeNav !== 'profile' && <div className="home-stats">
           <div className="stat-pill stat-pill-clickable" onClick={() => setStreakPopupOpen(o => !o)} style={{ position: 'relative' }}>
             <span className="stat-val">{streak.current}</span>
             <span className="stat-label">streak</span>
@@ -590,23 +651,25 @@ Respond ONLY with valid JSON, no other text:
           </div>
           <div className="stat-pill"><span className="stat-val">—</span><span className="stat-label">rank</span></div>
           <div className="stat-pill"><span className="stat-val">{streak.total}</span><span className="stat-label">total wins</span></div>
-        </div>
+        </div>}
       </div>
 
-      {/* TABS */}
-      <div className="tab-bar">
-        {['today', 'tomorrow', 'weekly', 'archive'].map(tab => (
-          <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
+      {/* SUB-TABS — only shown on Home nav */}
+      {activeNav === 'home' && (
+        <div className="tab-bar">
+          {['today', 'tomorrow', 'weekly'].map(tab => (
+            <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* CONTENT */}
       <div className="tab-content">
 
         {/* ── TODAY ── */}
-        {activeTab === 'today' && (
+        {activeNav === 'home' && activeTab === 'today' && (
           <div>
             <div className="progress-row">
               <span className="progress-label">{doneTasks} of {totalTasks} tasks</span>
@@ -697,7 +760,7 @@ Respond ONLY with valid JSON, no other text:
         )}
 
         {/* ── TOMORROW ── */}
-        {activeTab === 'tomorrow' && (
+        {activeNav === 'home' && activeTab === 'tomorrow' && (
           <div>
             <div className="add-row">
               <input
@@ -724,7 +787,7 @@ Respond ONLY with valid JSON, no other text:
         )}
 
         {/* ── WEEKLY ── */}
-        {activeTab === 'weekly' && (
+        {activeNav === 'home' && activeTab === 'weekly' && (
           <div>
             <p className="week-range">{weekRangeLabel()}</p>
 
@@ -783,8 +846,130 @@ Respond ONLY with valid JSON, no other text:
           </div>
         )}
 
+        {/* ── FRIENDS PLACEHOLDER ── */}
+        {activeNav === 'friends' && (
+          <div className="placeholder-screen">
+            <p className="placeholder-title">Friends</p>
+            <p className="placeholder-sub">Coming soon — add friends and see their daily wins.</p>
+          </div>
+        )}
+
+        {/* ── LEADERBOARD PLACEHOLDER ── */}
+        {activeNav === 'leaderboard' && (
+          <div className="placeholder-screen">
+            <p className="placeholder-title">Leaderboard</p>
+            <p className="placeholder-sub">Coming soon — see who's on the longest streak.</p>
+          </div>
+        )}
+
+        {/* ── PROFILE / SETTINGS ── */}
+        {activeNav === 'profile' && (
+          <div className="profile-screen">
+
+            {/* Avatar + identity */}
+            <div className="profile-identity">
+              <div className="profile-avatar">
+                {userProfile?.photoURL
+                  ? <img src={userProfile.photoURL} alt="avatar" className="profile-avatar-img" />
+                  : <span className="profile-avatar-initial">{(userProfile?.username || user?.email || '?')[0].toUpperCase()}</span>
+                }
+              </div>
+              <div>
+                <p className="profile-username">@{userProfile?.username || '—'}</p>
+                <p className="profile-email">{user?.email}</p>
+              </div>
+            </div>
+
+            {/* Streak summary */}
+            <div className="profile-stats-row">
+              <div className="profile-stat">
+                <span className="profile-stat-val">{streak.current}</span>
+                <span className="profile-stat-label">Current streak</span>
+              </div>
+              <div className="profile-stat">
+                <span className="profile-stat-val">{streak.best}</span>
+                <span className="profile-stat-label">Best streak</span>
+              </div>
+              <div className="profile-stat">
+                <span className="profile-stat-val">{streak.total}</span>
+                <span className="profile-stat-label">Total wins</span>
+              </div>
+            </div>
+
+            {/* Win definitions */}
+            <div className="profile-section">
+              <p className="profile-section-title">Win Definitions</p>
+              <p className="profile-section-sub">Used by Claude to evaluate your daily wins.</p>
+
+              <label className="profile-def-label">Physical</label>
+              <textarea
+                className="profile-def-input"
+                value={editPhysical}
+                onChange={e => setEditPhysical(e.target.value)}
+                rows={2}
+                placeholder="e.g. Any workout, climb, or run"
+              />
+              <label className="profile-def-label">Mental</label>
+              <textarea
+                className="profile-def-input"
+                value={editMental}
+                onChange={e => setEditMental(e.target.value)}
+                rows={2}
+                placeholder="e.g. Study session, deep work"
+              />
+              <label className="profile-def-label">Spiritual</label>
+              <textarea
+                className="profile-def-input"
+                value={editSpiritual}
+                onChange={e => setEditSpiritual(e.target.value)}
+                rows={2}
+                placeholder="e.g. Journal, meditate, sleep early"
+              />
+
+              <button
+                className="profile-save-btn"
+                onClick={saveWinDefinitions}
+                disabled={defsLoading}
+              >
+                {defsLoading ? 'Saving…' : defsSaved ? 'Saved!' : 'Save definitions'}
+              </button>
+            </div>
+
+            {/* Sign out */}
+            <div className="profile-section">
+              <button className="profile-signout-btn" onClick={() => signOut(auth)}>
+                Sign out
+              </button>
+            </div>
+
+            {/* Delete account */}
+            <div className="profile-section profile-danger-zone">
+              <p className="profile-section-title danger">Danger zone</p>
+              {!deleteConfirm ? (
+                <button className="profile-delete-btn" onClick={() => setDeleteConfirm(true)}>
+                  Delete account
+                </button>
+              ) : (
+                <div className="delete-confirm-box">
+                  <p className="delete-confirm-text">This permanently deletes your account and all data. This cannot be undone.</p>
+                  {deleteError && <p className="eval-error">{deleteError}</p>}
+                  <div className="delete-confirm-actions">
+                    <button className="profile-delete-btn" onClick={deleteAccount} disabled={deleteLoading}>
+                      {deleteLoading ? 'Deleting…' : 'Yes, delete my account'}
+                    </button>
+                    <button className="profile-cancel-btn" onClick={() => { setDeleteConfirm(false); setDeleteError('') }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
         {/* ── ARCHIVE ── */}
-        {activeTab === 'archive' && (
+        {activeNav === 'archive' && (
           <div>
             {archiveLoading && <p className="empty-msg">Loading archive…</p>}
 
@@ -921,6 +1106,69 @@ Respond ONLY with valid JSON, no other text:
         )}
 
       </div>
+
+      {/* ── BOTTOM NAV ── */}
+      <nav className="bottom-nav">
+        <button
+          className={`bottom-nav-item ${activeNav === 'home' ? 'active' : ''}`}
+          onClick={() => setActiveNav('home')}
+        >
+          <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+            <path d="M9 21V12h6v9"/>
+          </svg>
+          <span className="bottom-nav-label">Home</span>
+        </button>
+
+        <button
+          className={`bottom-nav-item ${activeNav === 'archive' ? 'active' : ''}`}
+          onClick={() => setActiveNav('archive')}
+        >
+          <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="5" rx="1"/>
+            <path d="M4 8v11a1 1 0 001 1h14a1 1 0 001-1V8"/>
+            <path d="M10 12h4"/>
+          </svg>
+          <span className="bottom-nav-label">Archive</span>
+        </button>
+
+        <button
+          className={`bottom-nav-item ${activeNav === 'friends' ? 'active' : ''}`}
+          onClick={() => setActiveNav('friends')}
+        >
+          <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/>
+            <path d="M16 3.13a4 4 0 010 7.75"/>
+            <path d="M21 21v-2a4 4 0 00-3-3.87"/>
+          </svg>
+          <span className="bottom-nav-label">Friends</span>
+        </button>
+
+        <button
+          className={`bottom-nav-item ${activeNav === 'leaderboard' ? 'active' : ''}`}
+          onClick={() => setActiveNav('leaderboard')}
+        >
+          <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="18" y="3" width="4" height="18" rx="1"/>
+            <rect x="10" y="8" width="4" height="13" rx="1"/>
+            <rect x="2" y="13" width="4" height="8" rx="1"/>
+          </svg>
+          <span className="bottom-nav-label">Ranks</span>
+        </button>
+
+        <button
+          className={`bottom-nav-item ${activeNav === 'profile' ? 'active' : ''}`}
+          onClick={() => setActiveNav('profile')}
+        >
+          <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M4 20v-1a8 8 0 0116 0v1"/>
+          </svg>
+          <span className="bottom-nav-label">Profile</span>
+        </button>
+      </nav>
+
     </div>
   )
 }

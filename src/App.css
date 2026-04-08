@@ -285,9 +285,6 @@ body {
   font-size: 1.2rem;
   cursor: pointer;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* ── TASK LIST ── */
@@ -795,4 +792,330 @@ body {
   font-weight: 500;
   color: #93c5fd;
   text-align: right;
+}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: #0f1923;
+  border-top: 0.5px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 200;
+  padding-bottom: env(safe-area-inset-bottom); /* iPhone home bar */
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.28);
+  cursor: pointer;
+  padding: 0.4rem 0;
+  transition: color 0.15s;
+}
+
+.bottom-nav-item.active {
+  color: #2563eb;
+}
+
+.bottom-nav-item:hover:not(.active) {
+  color: rgba(255,255,255,0.5);
+}
+
+.bottom-nav-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.bottom-nav-label {
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* Add padding so content doesn't hide behind nav */
+.tab-content {
+  padding-bottom: calc(1rem + 60px);
+}
+
+/* ── PLACEHOLDER SCREENS ── */
+.placeholder-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  text-align: center;
+  padding: 2rem;
+}
+
+.placeholder-title {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #e8f0fc;
+  margin-bottom: 0.5rem;
+}
+
+.placeholder-sub {
+  font-size: 0.85rem;
+  color: rgba(232,240,252,0.35);
+  line-height: 1.6;
+}
+
+/* ── PROFILE / SETTINGS ── */
+.profile-screen {
+  padding: 1.25rem 1rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.profile-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(37,99,235,0.2);
+  border: 1.5px solid rgba(37,99,235,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-initial {
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: #93c5fd;
+}
+
+.profile-username {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #e8f0fc;
+}
+
+.profile-email {
+  font-size: 0.78rem;
+  color: rgba(232,240,252,0.35);
+  margin-top: 2px;
+}
+
+/* Stats row */
+.profile-stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 1.5rem;
+}
+
+.profile-stat {
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 0.65rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.profile-stat-val {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #93c5fd;
+}
+
+.profile-stat-label {
+  font-size: 0.6rem;
+  color: rgba(147,197,253,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+/* Sections */
+.profile-section {
+  border-top: 0.5px solid rgba(255,255,255,0.07);
+  padding: 1.25rem 0;
+}
+
+.profile-section-title {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(147,197,253,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.35rem;
+}
+
+.profile-section-title.danger {
+  color: rgba(248,113,113,0.6);
+}
+
+.profile-section-sub {
+  font-size: 0.78rem;
+  color: rgba(232,240,252,0.3);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+/* Win def inputs */
+.profile-def-label {
+  display: block;
+  font-size: 0.7rem;
+  color: rgba(232,240,252,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.3rem;
+  margin-top: 0.75rem;
+}
+
+.profile-def-label:first-of-type {
+  margin-top: 0;
+}
+
+.profile-def-input {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  color: #e8f0fc;
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  line-height: 1.5;
+  transition: border-color 0.2s;
+}
+
+.profile-def-input:focus {
+  border-color: #2563eb;
+}
+
+.profile-def-input::placeholder {
+  color: rgba(232,240,252,0.2);
+}
+
+.profile-save-btn {
+  margin-top: 1rem;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.profile-save-btn:hover:not(:disabled) { background: #1d4ed8; }
+.profile-save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Sign out */
+.profile-signout-btn {
+  background: none;
+  border: 0.5px solid rgba(255,255,255,0.15);
+  color: rgba(232,240,252,0.5);
+  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+}
+
+.profile-signout-btn:hover {
+  border-color: rgba(255,255,255,0.3);
+  color: rgba(232,240,252,0.8);
+}
+
+/* Danger zone */
+.profile-danger-zone {
+  padding-bottom: 0.5rem;
+}
+
+.profile-delete-btn {
+  background: none;
+  border: 0.5px solid rgba(248,113,113,0.3);
+  color: rgba(248,113,113,0.7);
+  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+}
+
+.profile-delete-btn:hover:not(:disabled) {
+  background: rgba(248,113,113,0.08);
+  border-color: rgba(248,113,113,0.5);
+  color: rgba(248,113,113,0.9);
+}
+
+.profile-delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.delete-confirm-box {
+  background: rgba(248,113,113,0.05);
+  border: 0.5px solid rgba(248,113,113,0.15);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.delete-confirm-text {
+  font-size: 0.82rem;
+  color: rgba(232,240,252,0.5);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-cancel-btn {
+  background: none;
+  border: 0.5px solid rgba(255,255,255,0.12);
+  color: rgba(232,240,252,0.4);
+  border-radius: 8px;
+  padding: 0.6rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.profile-cancel-btn:hover {
+  border-color: rgba(255,255,255,0.25);
+  color: rgba(232,240,252,0.7);
 }
