@@ -107,6 +107,7 @@ function Home() {
 
   // Streak state
   const [streak, setStreak] = useState({ current: 0, total: 0, best: 0 })
+  const [streakPopupOpen, setStreakPopupOpen] = useState(false)
 
   // ── FIREBASE REFS ─────────────────────────────────────
   const todayRef = doc(db, 'tasks', uid, 'today', 'data')
@@ -561,7 +562,26 @@ Respond ONLY with valid JSON, no other text:
           <button className="signout-btn" onClick={() => signOut(auth)}>Sign out</button>
         </div>
         <div className="home-stats">
-          <div className="stat-pill"><span className="stat-val">{streak.current}</span><span className="stat-label">streak</span></div>
+          <div className="stat-pill stat-pill-clickable" onClick={() => setStreakPopupOpen(o => !o)} style={{ position: 'relative' }}>
+            <span className="stat-val">{streak.current}</span>
+            <span className="stat-label">streak</span>
+            {streakPopupOpen && (
+              <div className="streak-popup">
+                <div className="streak-popup-row">
+                  <span className="streak-popup-label">Current</span>
+                  <span className="streak-popup-val">{streak.current}</span>
+                </div>
+                <div className="streak-popup-row">
+                  <span className="streak-popup-label">Best</span>
+                  <span className="streak-popup-val">{streak.best}</span>
+                </div>
+                <div className="streak-popup-row">
+                  <span className="streak-popup-label">Total wins</span>
+                  <span className="streak-popup-val">{streak.total}</span>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="stat-pill"><span className="stat-val">—</span><span className="stat-label">rank</span></div>
           <div className="stat-pill"><span className="stat-val">{streak.total}</span><span className="stat-label">total wins</span></div>
         </div>

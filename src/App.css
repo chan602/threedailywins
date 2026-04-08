@@ -751,3 +751,45 @@ body {
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* ── STREAK POPUP ── */
+.stat-pill-clickable {
+  cursor: pointer;
+  user-select: none;
+}
+.stat-pill-clickable:hover { background: rgba(255,255,255,0.1); }
+
+.streak-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f1923;
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
+  z-index: 100;
+  min-width: 130px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.streak-popup-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.2rem 0;
+}
+
+.streak-popup-label {
+  font-size: 0.72rem;
+  color: rgba(232,240,252,0.4);
+  text-align: left;
+}
+
+.streak-popup-val {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #93c5fd;
+  text-align: right;
+}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { auth, db } from '../firebase'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { useNavigate } from 'react-router-dom'
 
 function Onboarding() {
@@ -10,14 +10,35 @@ function Onboarding() {
   const [mental, setMental] = useState('')
   const [spiritual, setSpritual] = useState('')
   const [error, setError] = useState('')
+  const [checking, setChecking] = useState(false)
   const navigate = useNavigate()
 
   const handleUsernameSubmit = async () => {
-    if (!username.trim() || username.length < 3) {
+    const trimmed = username.trim().toLowerCase()
+    if (!trimmed || trimmed.length < 3) {
       setError('Username must be at least 3 characters')
       return
     }
+
+    setChecking(true)
     setError('')
+
+    try {
+      const q = query(collection(db, 'users'), where('username', '==', trimmed))
+      const snap = await getDocs(q)
+      if (!snap.empty) {
+        setError('That username is already taken — try another.')
+        setChecking(false)
+        return
+      }
+    } catch (e) {
+      console.error('Username check failed:', e)
+      setError('Something went wrong — please try again.')
+      setChecking(false)
+      return
+    }
+
+    setChecking(false)
     setStep(2)
   }
 
@@ -25,7 +46,7 @@ function Onboarding() {
     const user = auth.currentUser
     await setDoc(doc(db, 'users', user.uid), {
       uid: user.uid,
-      username: username.toLowerCase(),
+      username: username.trim().toLowerCase(),
       displayName: user.displayName,
       email: user.email,
       photoURL: user.photoURL,
@@ -57,12 +78,12 @@ function Onboarding() {
               type="text"
               placeholder="e.g. nategoup"
               value={username}
-              onChange={e => setUsername(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleUsernameSubmit()}
+              onChange={e => { setUsername(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && !checking && handleUsernameSubmit()}
             />
             {error && <p className="error-text">{error}</p>}
-            <button className="google-btn" onClick={handleUsernameSubmit}>
-              Continue
+            <button className="google-btn" onClick={handleUsernameSubmit} disabled={checking}>
+              {checking ? 'Checking…' : 'Continue'}
             </button>
           </>
         )}
