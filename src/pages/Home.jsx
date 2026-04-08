@@ -8,7 +8,6 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 
 const WORKER_URL = 'https://anthropic-proxy.emailtonathan.workers.dev/'
-const WORKER_SECRET = '3w-app-2026-xk9m'  // ← same string as the worker
 
 // ── HELPERS ──────────────────────────────────────────────
 function todayStr() {
@@ -105,6 +104,9 @@ function Home() {
   // User profile (for win definitions)
   const [userProfile, setUserProfile] = useState(null)
 
+  // Streak state
+  const [streak, setStreak] = useState({ current: 0, total: 0, best: 0 })
+
   // ── FIREBASE REFS ─────────────────────────────────────
   const todayRef = doc(db, 'tasks', uid, 'today', 'data')
   const tmrwRef = doc(db, 'tasks', uid, 'tomorrow', tomorrowStr())
@@ -112,6 +114,7 @@ function Home() {
   const dailyRef = doc(db, 'tasks', uid, 'dailyRepeat', weekKey())
   const rolloverRef = doc(db, 'meta', uid, 'rollover', 'data')
   const winsRef = doc(db, 'wins', uid, 'days', todayStr())
+  const streakRef = doc(db, 'streak', uid, 'data', 'current')
 
   // ── LOAD USER PROFILE ─────────────────────────────────
   useEffect(() => {
@@ -234,7 +237,14 @@ function Home() {
       if (snap.exists()) setTodayWins(snap.data())
       else setTodayWins(null)
     })
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5() }
+    // Live streak listener
+    const unsub6 = onSnapshot(streakRef, snap => {
+      if (snap.exists()) {
+        const d = snap.data()
+        setStreak({ current: d.current ?? 0, total: d.total ?? 0, best: d.best ?? 0 })
+      }
+    })
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6() }
   }, [uid, rolloverDone])
 
   // ── LOAD ARCHIVE (when tab switches to archive) ───────
@@ -395,8 +405,7 @@ Respond ONLY with valid JSON, no other text:
     try {
       const response = await fetch(WORKER_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-    'X-App-Secret': '3w-app-2026-xk9m' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 400,
@@ -421,6 +430,7 @@ Respond ONLY with valid JSON, no other text:
       }
 
       await setDoc(winsRef, winsDoc)
+      await updateStreak(winsDoc)
       // onSnapshot will update todayWins state automatically
     } catch (e) {
       console.error('evaluateWins error:', e)
@@ -437,7 +447,45 @@ Respond ONLY with valid JSON, no other text:
     const effective = currentOverride !== null && currentOverride !== undefined ? currentOverride : currentAI
     const newVal = !effective
 
-    await setDoc(winsRef, { ...todayWins, [key]: newVal }, { merge: true })
+    const updated = { ...todayWins, [key]: newVal }
+    await setDoc(winsRef, updated, { merge: true })
+    await updateStreak(updated)
+  }
+
+  // ── STREAK ────────────────────────────────────────────
+  async function updateStreak(winsData) {
+    const todayIsWin = isThreeWinDay(winsData)
+
+    const snap = await getDoc(streakRef)
+    const existing = snap.exists()
+      ? snap.data()
+      : { current: 0, total: 0, best: 0, lastWinDate: '' }
+
+    let { current, total, best, lastWinDate } = existing
+
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yStr = yesterday.toLocaleDateString('en-CA')
+    const today = todayStr()
+
+    if (todayIsWin) {
+      if (lastWinDate !== today) {
+        current = (lastWinDate === yStr) ? current + 1 : 1
+        total = (total || 0) + 1
+        best = Math.max(best || 0, current)
+        lastWinDate = today
+      }
+    } else {
+      // If today was previously counted as a win but now isn't (override removed it)
+      if (lastWinDate === today) {
+        current = Math.max(0, current - 1)
+        total = Math.max(0, total - 1)
+        lastWinDate = yStr // roll back to yesterday
+      }
+    }
+
+    await setDoc(streakRef, { current, total, best, lastWinDate })
+    // onSnapshot will update streak state automatically
   }
 
   // ── ARCHIVE HELPERS ───────────────────────────────────
@@ -510,9 +558,9 @@ Respond ONLY with valid JSON, no other text:
           <button className="signout-btn" onClick={() => signOut(auth)}>Sign out</button>
         </div>
         <div className="home-stats">
-          <div className="stat-pill"><span className="stat-val">—</span><span className="stat-label">streak</span></div>
+          <div className="stat-pill"><span className="stat-val">{streak.current}</span><span className="stat-label">streak</span></div>
           <div className="stat-pill"><span className="stat-val">—</span><span className="stat-label">rank</span></div>
-          <div className="stat-pill"><span className="stat-val">—</span><span className="stat-label">total</span></div>
+          <div className="stat-pill"><span className="stat-val">{streak.total}</span><span className="stat-label">total wins</span></div>
         </div>
       </div>
 
