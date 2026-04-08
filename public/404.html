@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script>
+      var p = window.location.pathname;
+      var q = window.location.search;
+      window.location.replace(
+        window.location.origin + '/?p=' + encodeURIComponent(p + q)
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
