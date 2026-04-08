@@ -51,16 +51,20 @@ function getWeekKeyForDate(dateStr) {
 }
 
 function weekLabelFromKey(wk, weekStart) {
+  // Prefer stored weekStart (ISO date string of the Monday)
   if (weekStart) {
     return `Week of ${new Date(weekStart + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
   }
+  // Fallback: derive Monday from YYYY-WNN using ISO week logic
   const [yr, wNum] = wk.split('-W').map(Number)
-  const jan1 = new Date(yr, 0, 1)
-  const firstMon = new Date(jan1)
-  firstMon.setDate(jan1.getDate() + (8 - jan1.getDay()) % 7 || 7)
-  const weekStart2 = new Date(firstMon)
-  weekStart2.setDate(firstMon.getDate() + (wNum - 1) * 7)
-  return `Week of ${weekStart2.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  // Jan 4 is always in week 1 per ISO 8601
+  const jan4 = new Date(yr, 0, 4)
+  const jan4Day = jan4.getDay() || 7 // convert Sunday(0) to 7
+  const weekOneMon = new Date(jan4)
+  weekOneMon.setDate(jan4.getDate() - (jan4Day - 1))
+  const mon = new Date(weekOneMon)
+  mon.setDate(weekOneMon.getDate() + (wNum - 1) * 7)
+  return `Week of ${mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
 }
 
 function isThreeWinDay(w) {
@@ -446,12 +450,18 @@ Respond ONLY with valid JSON, no other text:
   async function toggleOverride(win) {
     if (!todayWins) return
     const key = `override${win.charAt(0).toUpperCase() + win.slice(1)}`
-    const currentOverride = todayWins[key]
-    const currentAI = todayWins[win]
-    const effective = currentOverride !== null && currentOverride !== undefined ? currentOverride : currentAI
-    const newVal = !effective
+    const isOverridden = todayWins[key] != null
 
-    const updated = { ...todayWins, [key]: newVal }
+    let updated
+    if (isOverridden) {
+      // Revert: clear the override back to null (AI result takes effect again)
+      updated = { ...todayWins, [key]: null }
+    } else {
+      // Override: flip the current effective value
+      const currentAI = todayWins[win]
+      updated = { ...todayWins, [key]: !currentAI }
+    }
+
     await setDoc(winsRef, updated, { merge: true })
     await updateStreak(updated)
   }
@@ -574,10 +584,6 @@ Respond ONLY with valid JSON, no other text:
                 <div className="streak-popup-row">
                   <span className="streak-popup-label">Best</span>
                   <span className="streak-popup-val">{streak.best}</span>
-                </div>
-                <div className="streak-popup-row">
-                  <span className="streak-popup-label">Total wins</span>
-                  <span className="streak-popup-val">{streak.total}</span>
                 </div>
               </div>
             )}
