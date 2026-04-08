@@ -2,11 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/threedailywins/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>threedailywins</title>
-    <script type="module" crossorigin src="/threedailywins/assets/index-CI1vOTtC.js"></script>
-    <link rel="stylesheet" crossorigin href="/threedailywins/assets/index-KJqfOws_.css">
+    <script>
+      (function() {
+        var p = new URLSearchParams(window.location.search).get('p');
+        if (p) history.replaceState(null, null, p);
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-CtZzzufB.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-KJqfOws_.css">
   </head>
   <body>
     <div id="root"></div>
