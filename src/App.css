@@ -1706,3 +1706,74 @@ body {
   margin-top: 0.5rem;
   text-align: right;
 }
+
+/* ── WINS PANEL POLISH ── */
+.win-definition {
+  font-size: 0.78rem;
+  color: rgba(232,240,252,0.35);
+  margin-top: 0.35rem;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.win-override-note {
+  font-size: 0.75rem;
+  color: rgba(147,197,253,0.5);
+  margin-top: 0.35rem;
+  font-style: italic;
+}
+
+.override-box {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.override-comment-input {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: #e8f0fc;
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.override-comment-input:focus { border-color: #2563eb; }
+.override-comment-input::placeholder { color: rgba(232,240,252,0.2); }
+
+.override-apply-btn {
+  background: rgba(37,99,235,0.15);
+  border: 0.5px solid rgba(37,99,235,0.3);
+  color: #93c5fd;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: all 0.2s;
+}
+.override-apply-btn:hover { background: rgba(37,99,235,0.25); }
+
+/* ── USER PROFILE ARCHIVE ── */
+.upro-archive-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.25rem 0;
+}
+
+.upro-archive-count {
+  font-size: 0.72rem;
+  color: rgba(232,240,252,0.25);
+}
+
+.upro-archive-body {
+  margin-top: 0.75rem;
+}

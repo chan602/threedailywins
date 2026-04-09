@@ -141,6 +141,10 @@ function Home() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  // Override comment state — keyed by win type
+  const [overrideComments, setOverrideComments] = useState({ physical: '', mental: '', spiritual: '' })
+  const [overrideOpen, setOverrideOpen] = useState({ physical: false, mental: false, spiritual: false })
+
   // Visibility settings state
   const [visTodo, setVisTodo] = useState('friends')
   const [visStats, setVisStats] = useState('public')
@@ -511,23 +515,35 @@ Respond ONLY with valid JSON, no other text:
     setEvalLoading(false)
   }
 
-  async function toggleOverride(win) {
+  function openOverride(win) {
+    // Toggle comment box open — don't apply override yet
+    setOverrideOpen(prev => ({ ...prev, [win]: !prev[win] }))
+  }
+
+  async function applyOverride(win) {
     if (!todayWins) return
     const key = `override${win.charAt(0).toUpperCase() + win.slice(1)}`
-    const isOverridden = todayWins[key] != null
-
-    let updated
-    if (isOverridden) {
-      // Revert: clear the override back to null (AI result takes effect again)
-      updated = { ...todayWins, [key]: null }
-    } else {
-      // Override: flip the current effective value
-      const currentAI = todayWins[win]
-      updated = { ...todayWins, [key]: !currentAI }
+    const noteKey = `note${win.charAt(0).toUpperCase() + win.slice(1)}`
+    const currentAI = todayWins[win]
+    const updated = {
+      ...todayWins,
+      [key]: !currentAI,
+      [noteKey]: overrideComments[win].trim()
     }
-
     await setDoc(winsRef, updated, { merge: true })
     await updateStreak(updated)
+    setOverrideOpen(prev => ({ ...prev, [win]: false }))
+  }
+
+  async function revertOverride(win) {
+    if (!todayWins) return
+    const key = `override${win.charAt(0).toUpperCase() + win.slice(1)}`
+    const noteKey = `note${win.charAt(0).toUpperCase() + win.slice(1)}`
+    const updated = { ...todayWins, [key]: null, [noteKey]: '' }
+    await setDoc(winsRef, updated, { merge: true })
+    await updateStreak(updated)
+    setOverrideComments(prev => ({ ...prev, [win]: '' }))
+    setOverrideOpen(prev => ({ ...prev, [win]: false }))
   }
 
   // ── STREAK ────────────────────────────────────────────
@@ -804,7 +820,7 @@ Respond ONLY with valid JSON, no other text:
           <span className="home-logo">threedailywins</span>
         </div>
         {activeNav !== 'profile' && <div className="home-stats">
-          <div className="stat-pill stat-pill-clickable" onClick={() => setStreakPopupOpen(o => !o)} style={{ position: 'relative' }}>
+          <div className="stat-pill stat-pill-clickable" onClick={() => setStreakPopupOpen(o => !o)} onMouseLeave={() => setStreakPopupOpen(false)} style={{ position: 'relative' }}>
             <span className="stat-val">{streak.current}</span>
             <span className="stat-label">streak</span>
             {streakPopupOpen && (
@@ -898,8 +914,18 @@ Respond ONLY with valid JSON, no other text:
               {['physical', 'mental', 'spiritual'].map(type => {
                 const effective = getEffectiveWin(todayWins, type)
                 const overrideKey = `override${type.charAt(0).toUpperCase() + type.slice(1)}`
+                const noteKey = `note${type.charAt(0).toUpperCase() + type.slice(1)}`
                 const isOverridden = todayWins?.[overrideKey] != null
+                const isOverrideOpen = overrideOpen[type]
                 const labels = { physical: 'Physical', mental: 'Mental', spiritual: 'Spiritual' }
+
+                // Dynamic reasoning: extract sentence mentioning this win type from reasoning
+                const fullReasoning = todayWins?.reasoning || ''
+                const sentences = fullReasoning.split('. ')
+                const relevantLine = sentences.find(s => s.toLowerCase().includes(type)) || fullReasoning
+
+                // Definition to show before eval
+                const def = userProfile?.winsDefinition?.[type] || ''
 
                 return (
                   <div key={type} className={`win-row ${effective === true ? 'achieved' : effective === false ? 'missed' : 'pending'}`}>
@@ -909,19 +935,42 @@ Respond ONLY with valid JSON, no other text:
                         <span className={`win-status-pill ${effective === true ? 'achieved' : effective === false ? 'missed' : 'pending'}`}>
                           {effective === true ? '✓ Achieved' : effective === false ? '✗ Not detected' : '– Pending'}
                         </span>
-                        {todayWins?.evaluatedAt && (
-                          <button
-                            className="override-btn"
-                            onClick={() => toggleOverride(type)}
-                            title={isOverridden ? 'Overridden' : 'Override'}
-                          >
-                            {isOverridden ? 'Revert' : 'Override'}
+                        {todayWins?.evaluatedAt && !isOverridden && (
+                          <button className="override-btn" onClick={() => openOverride(type)}>
+                            {isOverrideOpen ? 'Cancel' : 'Override'}
                           </button>
+                        )}
+                        {isOverridden && (
+                          <button className="override-btn" onClick={() => revertOverride(type)}>Revert</button>
                         )}
                       </div>
                     </div>
-                    {todayWins?.reasoning && (
-                      <p className="win-reasoning">{todayWins.reasoning}</p>
+
+                    {/* Show definition before eval, reasoning after */}
+                    {!todayWins?.evaluatedAt && def && (
+                      <p className="win-definition">{def}</p>
+                    )}
+                    {todayWins?.evaluatedAt && relevantLine && (
+                      <p className="win-reasoning">{relevantLine}</p>
+                    )}
+                    {isOverridden && todayWins?.[noteKey] && (
+                      <p className="win-override-note">Note: {todayWins[noteKey]}</p>
+                    )}
+
+                    {/* Override comment box */}
+                    {isOverrideOpen && !isOverridden && (
+                      <div className="override-box">
+                        <input
+                          className="override-comment-input"
+                          placeholder="Optional note (e.g. did a long walk)"
+                          value={overrideComments[type]}
+                          onChange={e => setOverrideComments(prev => ({ ...prev, [type]: e.target.value }))}
+                          onKeyDown={e => e.key === 'Enter' && applyOverride(type)}
+                        />
+                        <button className="override-apply-btn" onClick={() => applyOverride(type)}>
+                          Confirm override
+                        </button>
+                      </div>
                     )}
                   </div>
                 )
