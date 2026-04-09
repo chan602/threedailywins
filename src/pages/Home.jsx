@@ -141,6 +141,11 @@ function Home() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  // Visibility settings state
+  const [visTodo, setVisTodo] = useState('friends')
+  const [visStats, setVisStats] = useState('public')
+  const [visSaved, setVisSaved] = useState(false)
+
   // ── FIREBASE REFS ─────────────────────────────────────
   const todayRef = doc(db, 'tasks', uid, 'today', 'data')
   const tmrwRef = doc(db, 'tasks', uid, 'tomorrow', tomorrowStr())
@@ -160,6 +165,8 @@ function Home() {
         setEditPhysical(data.winsDefinition?.physical || '')
         setEditMental(data.winsDefinition?.mental || '')
         setEditSpiritual(data.winsDefinition?.spiritual || '')
+        setVisTodo(data.visibility?.todo || 'friends')
+        setVisStats(data.visibility?.stats || 'public')
       }
     })
   }, [uid])
@@ -588,6 +595,22 @@ Respond ONLY with valid JSON, no other text:
     setDefsLoading(false)
     setDefsSaved(true)
     setTimeout(() => setDefsSaved(false), 2500)
+  }
+
+  async function saveVisibility(todoVal, statsVal) {
+    if (!uid) return
+    const updated = {
+      ...userProfile,
+      visibility: {
+        todo: todoVal,
+        archive: todoVal,   // archive follows todo for now
+        stats: statsVal,
+      }
+    }
+    await setDoc(doc(db, 'users', uid), updated)
+    setUserProfile(updated)
+    setVisSaved(true)
+    setTimeout(() => setVisSaved(false), 2500)
   }
 
   async function deleteAccount() {
@@ -1341,6 +1364,54 @@ Respond ONLY with valid JSON, no other text:
               >
                 {defsLoading ? 'Saving…' : defsSaved ? 'Saved!' : 'Save definitions'}
               </button>
+            </div>
+
+            {/* Visibility settings */}
+            <div className="profile-section">
+              <p className="profile-section-title">Visibility</p>
+              <p className="profile-section-sub">Control what others can see on your profile.</p>
+
+              <div className="vis-row">
+                <div className="vis-row-left">
+                  <span className="vis-label">Todo list</span>
+                  <span className="vis-desc">Today's tasks on your profile</span>
+                </div>
+                <select
+                  className="vis-select"
+                  value={visTodo}
+                  onChange={e => {
+                    setVisTodo(e.target.value)
+                    setVisSaved(false)
+                    saveVisibility(e.target.value, visStats)
+                  }}
+                >
+                  <option value="public">Public</option>
+                  <option value="friends">Friends</option>
+                  <option value="private">Private</option>
+                </select>
+              </div>
+
+              <div className="vis-row">
+                <div className="vis-row-left">
+                  <span className="vis-label">Stats</span>
+                  <span className="vis-desc">Streak and win counts</span>
+                </div>
+                <select
+                  className="vis-select"
+                  value={visStats}
+                  onChange={e => {
+                    setVisStats(e.target.value)
+                    setVisSaved(false)
+                    saveVisibility(visTodo, e.target.value)
+                  }}
+                >
+                  <option value="public">Public</option>
+                  <option value="friends">Friends</option>
+                  <option value="private">Private</option>
+                </select>
+              </div>
+
+              {visSaved && <p className="vis-saved">Saved!</p>}
             </div>
 
             {/* Sign out */}

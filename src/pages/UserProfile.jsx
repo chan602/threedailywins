@@ -70,20 +70,34 @@ function UserProfile() {
       const isOwn = viewer?.uid === uid
       const visibility = userData.visibility || { todo: 'friends', archive: 'friends', stats: 'public' }
 
-      // 2. Load streak if stats are public
-      if (isOwn || visibility.stats === 'public') {
+      // 2. Check if viewer is a friend of this user
+      let isFriend = false
+      if (!isOwn && viewer?.uid) {
+        const friendSnap = await getDoc(doc(db, 'friends', uid, 'list', viewer.uid))
+        isFriend = friendSnap.exists()
+      }
+
+      // Helper: can viewer see this section?
+      const canSee = (level) => {
+        if (isOwn) return true
+        if (level === 'public') return true
+        if (level === 'friends' && isFriend) return true
+        return false
+      }
+
+      // 3. Load streak if stats visibility allows
+      if (canSee(visibility.stats)) {
         const streakSnap = await getDoc(doc(db, 'streak', uid, 'data', 'current'))
         if (streakSnap.exists()) setStreak(streakSnap.data())
       }
 
-      // 3. Load today's tasks if todo visibility allows
-      // For now: 'public' = visible to all, anything else = hidden to non-owners
-      if (isOwn || visibility.todo === 'public') {
+      // 4. Load today's tasks if todo visibility allows
+      if (canSee(visibility.todo)) {
         const taskSnap = await getDoc(doc(db, 'tasks', uid, 'today', 'data'))
         if (taskSnap.exists()) setTodayTasks(taskSnap.data().tasks || [])
         else setTodayTasks([])
 
-        // Load today's wins for the badge display
+        // Load today's wins for badge display
         const winsSnap = await getDoc(doc(db, 'wins', uid, 'days', todayStr()))
         if (winsSnap.exists()) setTodayWins(winsSnap.data())
       }
