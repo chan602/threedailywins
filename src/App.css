@@ -1473,3 +1473,181 @@ body {
   padding: 0.4rem 0;
   letter-spacing: 0.1em;
 }
+
+/* ── FRIENDS SCREEN ── */
+.friends-result {
+  background: rgba(255,255,255,0.03);
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.friends-result-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.friends-result-name {
+  font-size: 0.88rem;
+  color: #e8f0fc;
+  cursor: pointer;
+}
+.friends-result-name:hover { text-decoration: underline; }
+
+.friends-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.friends-add-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.friends-add-btn:hover:not(:disabled) { background: #1d4ed8; }
+.friends-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.friends-view-btn {
+  background: none;
+  border: 0.5px solid rgba(255,255,255,0.15);
+  color: rgba(232,240,252,0.5);
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.friends-view-btn:hover { border-color: rgba(255,255,255,0.3); color: rgba(232,240,252,0.8); }
+
+.friends-status-msg {
+  font-size: 0.78rem;
+  color: rgba(232,240,252,0.35);
+}
+.friends-status-green { color: rgba(34,197,94,0.7); }
+
+.friends-section {
+  margin-bottom: 1.25rem;
+}
+
+.friends-section-title {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(147,197,253,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.friends-badge {
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  letter-spacing: 0;
+}
+
+.friends-request-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.5rem;
+  border-radius: 8px;
+  margin-bottom: 3px;
+}
+.friends-request-row:hover { background: rgba(255,255,255,0.02); }
+
+.friends-req-name {
+  flex: 1;
+  font-size: 0.88rem;
+  color: rgba(232,240,252,0.8);
+  cursor: pointer;
+}
+.friends-req-name:hover { text-decoration: underline; }
+
+.friends-req-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.friends-accept-btn {
+  background: rgba(34,197,94,0.15);
+  border: 0.5px solid rgba(34,197,94,0.3);
+  color: rgba(34,197,94,0.9);
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.friends-accept-btn:hover { background: rgba(34,197,94,0.25); }
+
+.friends-decline-btn {
+  background: none;
+  border: 0.5px solid rgba(255,255,255,0.1);
+  color: rgba(232,240,252,0.35);
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.friends-decline-btn:hover { border-color: rgba(248,113,113,0.3); color: rgba(248,113,113,0.6); }
+
+.friends-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.5rem;
+  border-radius: 8px;
+  margin-bottom: 3px;
+}
+.friends-list-row:hover { background: rgba(255,255,255,0.02); }
+
+.friends-list-name {
+  flex: 1;
+  font-size: 0.88rem;
+  color: rgba(232,240,252,0.8);
+  cursor: pointer;
+}
+.friends-list-name:hover { text-decoration: underline; }
+
+.friends-remove-btn {
+  background: none;
+  border: 0.5px solid rgba(255,255,255,0.08);
+  color: rgba(232,240,252,0.25);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.friends-remove-btn:hover {
+  border-color: rgba(248,113,113,0.3);
+  color: rgba(248,113,113,0.6);
+}
+
+.friends-empty {
+  font-size: 0.82rem;
+  color: rgba(232,240,252,0.2);
+  font-style: italic;
+}

@@ -125,6 +125,12 @@ function Home() {
   const [lbEntries, setLbEntries] = useState([])
   const [lbLoading, setLbLoading] = useState(false)
 
+  // Friends state
+  const [incomingRequests, setIncomingRequests] = useState([])  // array of { uid, username, photoURL, sentAt }
+  const [friendsList, setFriendsList] = useState([])            // array of { uid, username, photoURL }
+  const [sendRequestStatus, setSendRequestStatus] = useState('') // '', 'sending', 'sent', 'already_friends', 'already_sent', 'error'
+  const [searchedUser, setSearchedUser] = useState(null)        // { uid, username, photoURL } from last search
+
   // Profile / settings state
   const [editPhysical, setEditPhysical] = useState('')
   const [editMental, setEditMental] = useState('')
@@ -280,6 +286,22 @@ function Home() {
     })
     return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6() }
   }, [uid, rolloverDone])
+
+  // ── FRIENDS LISTENERS ────────────────────────────────
+  useEffect(() => {
+    if (!uid) return
+    // Listen to incoming friend requests
+    const reqRef = collection(db, 'friendRequests', uid, 'incoming')
+    const unsubReq = onSnapshot(reqRef, snap => {
+      setIncomingRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    // Listen to confirmed friends list
+    const friendsRef = collection(db, 'friends', uid, 'list')
+    const unsubFriends = onSnapshot(friendsRef, snap => {
+      setFriendsList(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    return () => { unsubReq(); unsubFriends() }
+  }, [uid])
 
   // ── LOAD ARCHIVE (when tab switches to archive) ───────
   useEffect(() => {
@@ -598,6 +620,8 @@ Respond ONLY with valid JSON, no other text:
     const trimmed = friendSearch.trim().toLowerCase()
     if (!trimmed) return
     setFriendSearchError('')
+    setSearchedUser(null)
+    setSendRequestStatus('')
     try {
       const q = query(collection(db, 'users'), where('username', '==', trimmed))
       const snap = await getDocs(q)
@@ -605,10 +629,74 @@ Respond ONLY with valid JSON, no other text:
         setFriendSearchError('No user found with that username.')
         return
       }
-      navigate(`/u/${trimmed}`)
+      const found = snap.docs[0].data()
+      setSearchedUser({ uid: found.uid, username: found.username, photoURL: found.photoURL || '' })
     } catch (e) {
       setFriendSearchError('Something went wrong — try again.')
     }
+  }
+
+  async function sendFriendRequest() {
+    if (!searchedUser || !uid) return
+    const targetUid = searchedUser.uid
+
+    // Can't add yourself
+    if (targetUid === uid) {
+      setSendRequestStatus('error_self')
+      return
+    }
+
+    setSendRequestStatus('sending')
+
+    // Check if already friends
+    const friendSnap = await getDoc(doc(db, 'friends', uid, 'list', targetUid))
+    if (friendSnap.exists()) {
+      setSendRequestStatus('already_friends')
+      return
+    }
+
+    // Check if request already sent
+    const sentSnap = await getDoc(doc(db, 'friendRequests', targetUid, 'incoming', uid))
+    if (sentSnap.exists()) {
+      setSendRequestStatus('already_sent')
+      return
+    }
+
+    // Send request — write to their incoming subcollection
+    await setDoc(doc(db, 'friendRequests', targetUid, 'incoming', uid), {
+      uid,
+      username: userProfile?.username || '',
+      photoURL: user?.photoURL || '',
+      sentAt: Date.now()
+    })
+    setSendRequestStatus('sent')
+  }
+
+  async function acceptRequest(senderUid, senderUsername, senderPhotoURL) {
+    // Write to both friends lists
+    await setDoc(doc(db, 'friends', uid, 'list', senderUid), {
+      uid: senderUid,
+      username: senderUsername,
+      photoURL: senderPhotoURL || '',
+      since: Date.now()
+    })
+    await setDoc(doc(db, 'friends', senderUid, 'list', uid), {
+      uid,
+      username: userProfile?.username || '',
+      photoURL: user?.photoURL || '',
+      since: Date.now()
+    })
+    // Remove the request
+    await deleteDoc(doc(db, 'friendRequests', uid, 'incoming', senderUid))
+  }
+
+  async function declineRequest(senderUid) {
+    await deleteDoc(doc(db, 'friendRequests', uid, 'incoming', senderUid))
+  }
+
+  async function removeFriend(friendUid) {
+    await deleteDoc(doc(db, 'friends', uid, 'list', friendUid))
+    await deleteDoc(doc(db, 'friends', friendUid, 'list', uid))
   }
 
   // ── LEADERBOARD ──────────────────────────────────────
@@ -906,25 +994,119 @@ Respond ONLY with valid JSON, no other text:
           </div>
         )}
 
-        {/* ── FRIENDS PLACEHOLDER ── */}
+        {/* ── FRIENDS ── */}
         {activeNav === 'friends' && (
           <div className="friends-screen">
+
+            {/* Search */}
             <p className="friends-title">Find people</p>
-            <p className="friends-sub">Search by username to view someone's profile.</p>
+            <p className="friends-sub">Search by username to add as a friend.</p>
             <div className="friends-search-row">
               <span className="friends-at">@</span>
               <input
                 className="friends-input"
                 placeholder="username"
                 value={friendSearch}
-                onChange={e => { setFriendSearch(e.target.value); setFriendSearchError('') }}
+                onChange={e => { setFriendSearch(e.target.value); setFriendSearchError(''); setSearchedUser(null); setSendRequestStatus('') }}
                 onKeyDown={e => e.key === 'Enter' && searchUser()}
               />
-              <button className="friends-search-btn" onClick={searchUser}>Go</button>
+              <button className="friends-search-btn" onClick={searchUser}>Search</button>
             </div>
             {friendSearchError && <p className="friends-error">{friendSearchError}</p>}
+
+            {/* Search result */}
+            {searchedUser && (
+              <div className="friends-result">
+                <div className="friends-result-identity">
+                  <div className="lb-avatar">
+                    {searchedUser.photoURL
+                      ? <img src={searchedUser.photoURL} alt="" className="profile-avatar-img" />
+                      : <span className="profile-avatar-initial">{searchedUser.username[0].toUpperCase()}</span>
+                    }
+                  </div>
+                  <span className="friends-result-name" onClick={() => navigate(`/u/${searchedUser.username}`)}>
+                    @{searchedUser.username}
+                  </span>
+                </div>
+                <div className="friends-result-actions">
+                  {searchedUser.uid === uid ? (
+                    <span className="friends-status-msg">That's you</span>
+                  ) : friendsList.some(f => f.uid === searchedUser.uid) ? (
+                    <span className="friends-status-msg friends-status-green">Already friends</span>
+                  ) : sendRequestStatus === 'sent' ? (
+                    <span className="friends-status-msg friends-status-green">Request sent!</span>
+                  ) : sendRequestStatus === 'already_sent' ? (
+                    <span className="friends-status-msg">Request already sent</span>
+                  ) : (
+                    <button
+                      className="friends-add-btn"
+                      onClick={sendFriendRequest}
+                      disabled={sendRequestStatus === 'sending'}
+                    >
+                      {sendRequestStatus === 'sending' ? 'Sending…' : '+ Add friend'}
+                    </button>
+                  )}
+                  <button className="friends-view-btn" onClick={() => navigate(`/u/${searchedUser.username}`)}>
+                    View profile
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="friends-divider" />
-            <p className="friends-coming-soon">Friend requests and a friends list are coming soon.</p>
+
+            {/* Incoming requests */}
+            {incomingRequests.length > 0 && (
+              <div className="friends-section">
+                <p className="friends-section-title">
+                  Friend requests
+                  <span className="friends-badge">{incomingRequests.length}</span>
+                </p>
+                {incomingRequests.map(req => (
+                  <div key={req.id} className="friends-request-row">
+                    <div className="lb-avatar">
+                      {req.photoURL
+                        ? <img src={req.photoURL} alt="" className="profile-avatar-img" />
+                        : <span className="profile-avatar-initial">{(req.username || '?')[0].toUpperCase()}</span>
+                      }
+                    </div>
+                    <span
+                      className="friends-req-name"
+                      onClick={() => navigate(`/u/${req.username}`)}
+                    >@{req.username}</span>
+                    <div className="friends-req-actions">
+                      <button className="friends-accept-btn" onClick={() => acceptRequest(req.uid, req.username, req.photoURL)}>Accept</button>
+                      <button className="friends-decline-btn" onClick={() => declineRequest(req.uid)}>Decline</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Friends list */}
+            <div className="friends-section">
+              <p className="friends-section-title">Friends ({friendsList.length})</p>
+              {friendsList.length === 0 ? (
+                <p className="friends-empty">No friends yet — search for someone to add.</p>
+              ) : (
+                friendsList.map(f => (
+                  <div key={f.id} className="friends-list-row">
+                    <div className="lb-avatar">
+                      {f.photoURL
+                        ? <img src={f.photoURL} alt="" className="profile-avatar-img" />
+                        : <span className="profile-avatar-initial">{(f.username || '?')[0].toUpperCase()}</span>
+                      }
+                    </div>
+                    <span
+                      className="friends-list-name"
+                      onClick={() => navigate(`/u/${f.username}`)}
+                    >@{f.username}</span>
+                    <button className="friends-remove-btn" onClick={() => removeFriend(f.uid)}>Remove</button>
+                  </div>
+                ))
+              )}
+            </div>
+
           </div>
         )}
 
@@ -948,10 +1130,45 @@ Respond ONLY with valid JSON, no other text:
               >Friends</button>
             </div>
 
-            {/* Friends placeholder */}
+            {/* Friends leaderboard */}
             {lbTab === 'friends' && (
-              <div className="lb-coming-soon">
-                <p>Friend leaderboard coming soon.</p>
+              <div className="lb-list" style={{ padding: '0 1rem' }}>
+                {friendsList.length === 0 ? (
+                  <p className="empty-msg" style={{ paddingTop: '1.5rem' }}>Add friends to see a friend leaderboard.</p>
+                ) : (() => {
+                  // Filter leaderboard entries to friends + self
+                  const friendUids = new Set([...friendsList.map(f => f.uid), uid])
+                  const sorted = lbEntries
+                    .filter(e => friendUids.has(e.uid))
+                    .sort((a, b) => (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0))
+                  return sorted.map((entry, i) => {
+                    const isMe = entry.uid === uid
+                    return (
+                      <div key={entry.uid} className={`lb-row ${isMe ? 'me' : ''}`}
+                        onClick={() => entry.username && navigate(`/u/${entry.username}`)}>
+                        <span className={`lb-rank ${i < 3 ? 'top' : ''}`}>{i + 1}</span>
+                        <div className="lb-avatar">
+                          {entry.photoURL
+                            ? <img src={entry.photoURL} alt="" className="profile-avatar-img" />
+                            : <span className="profile-avatar-initial">{(entry.username || '?')[0].toUpperCase()}</span>
+                          }
+                        </div>
+                        <span className="lb-username">
+                          @{entry.username || '—'}
+                          {isMe && <span className="lb-you"> you</span>}
+                        </span>
+                        <div className="lb-stats">
+                          <span className="lb-stat-val">{entry.current ?? 0}</span>
+                          <span className="lb-stat-label">streak</span>
+                        </div>
+                        <div className="lb-stats">
+                          <span className="lb-stat-val">{entry.total ?? 0}</span>
+                          <span className="lb-stat-label">wins</span>
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
               </div>
             )}
 
