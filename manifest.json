@@ -1,0 +1,24 @@
+{
+  "name": "Three Daily Wins",
+  "short_name": "3Wins",
+  "description": "Track your three daily wins — physical, mental, spiritual.",
+  "start_url": "/home",
+  "display": "standalone",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0f1923",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
