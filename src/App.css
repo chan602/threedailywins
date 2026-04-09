@@ -1119,3 +1119,357 @@ body {
   border-color: rgba(255,255,255,0.25);
   color: rgba(232,240,252,0.7);
 }
+
+/* ── FRIENDS SEARCH ── */
+.friends-screen {
+  padding: 1.25rem 1rem;
+}
+
+.friends-title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #e8f0fc;
+  margin-bottom: 0.25rem;
+}
+
+.friends-sub {
+  font-size: 0.82rem;
+  color: rgba(232,240,252,0.35);
+  margin-bottom: 1.25rem;
+  line-height: 1.5;
+}
+
+.friends-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.friends-at {
+  font-size: 1rem;
+  color: rgba(232,240,252,0.4);
+  flex-shrink: 0;
+}
+
+.friends-input {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  color: #e8f0fc;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.friends-input:focus { border-color: #2563eb; }
+.friends-input::placeholder { color: rgba(232,240,252,0.2); }
+
+.friends-search-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.friends-search-btn:hover { background: #1d4ed8; }
+
+.friends-error {
+  font-size: 0.8rem;
+  color: #f87171;
+  margin-bottom: 0.75rem;
+}
+
+.friends-divider {
+  border: none;
+  border-top: 0.5px solid rgba(255,255,255,0.07);
+  margin: 1.5rem 0 1rem;
+}
+
+.friends-coming-soon {
+  font-size: 0.78rem;
+  color: rgba(232,240,252,0.2);
+  font-style: italic;
+}
+
+/* ── USER PROFILE PAGE ── */
+.upro-shell {
+  min-height: 100vh;
+  background: #0a0f1e;
+  padding: 1.25rem 1rem 4rem;
+  color: #e8f0fc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.upro-back {
+  background: none;
+  border: none;
+  color: rgba(232,240,252,0.45);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1.5rem;
+  display: block;
+  transition: color 0.2s;
+}
+.upro-back:hover { color: rgba(232,240,252,0.8); }
+
+.upro-loading, .upro-not-found {
+  font-size: 0.88rem;
+  color: rgba(232,240,252,0.35);
+  margin-top: 2rem;
+}
+
+.upro-not-found strong { color: rgba(232,240,252,0.6); }
+
+.upro-identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.upro-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(37,99,235,0.2);
+  border: 1.5px solid rgba(37,99,235,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.upro-username {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #e8f0fc;
+}
+
+.upro-own-badge {
+  font-size: 0.7rem;
+  color: rgba(147,197,253,0.6);
+  margin-top: 2px;
+}
+
+.upro-section {
+  border-top: 0.5px solid rgba(255,255,255,0.07);
+  padding: 1rem 0;
+}
+
+.upro-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.upro-section-title {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(147,197,253,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.upro-task-meta {
+  font-size: 0.72rem;
+  color: rgba(232,240,252,0.3);
+}
+
+.upro-task-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+.upro-task-dot.done { background: #2563eb; border-color: #2563eb; }
+
+.upro-hidden-section {
+  background: rgba(255,255,255,0.02);
+  border: 0.5px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.upro-hidden-msg {
+  font-size: 0.82rem;
+  color: rgba(232,240,252,0.25);
+  font-style: italic;
+}
+
+.upro-defs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.upro-def-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.upro-def-label {
+  font-size: 0.7rem;
+  color: rgba(147,197,253,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.upro-def-text {
+  font-size: 0.82rem;
+  color: rgba(232,240,252,0.5);
+  line-height: 1.5;
+}
+
+/* ── LEADERBOARD ── */
+.lb-screen {
+  padding: 1rem 0 0;
+}
+
+.lb-tabs {
+  display: flex;
+  border-bottom: 0.5px solid rgba(255,255,255,0.07);
+  margin-bottom: 0.75rem;
+}
+
+.lb-tab {
+  flex: 1;
+  padding: 0.6rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.lb-tab.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+.lb-coming-soon {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: rgba(232,240,252,0.25);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
+.lb-list {
+  padding: 0 1rem;
+}
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  margin-bottom: 3px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lb-row:hover { background: rgba(255,255,255,0.03); }
+.lb-row.me {
+  background: rgba(37,99,235,0.08);
+  border: 0.5px solid rgba(37,99,235,0.2);
+}
+
+.lb-rank {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(232,240,252,0.3);
+  min-width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.lb-rank.top {
+  color: #93c5fd;
+  font-size: 0.85rem;
+}
+
+.lb-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(37,99,235,0.15);
+  border: 1px solid rgba(37,99,235,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  font-size: 0.85rem;
+}
+
+.lb-username {
+  flex: 1;
+  font-size: 0.88rem;
+  color: rgba(232,240,252,0.8);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-you {
+  font-size: 0.68rem;
+  color: #2563eb;
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+.lb-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+  flex-shrink: 0;
+}
+
+.lb-stat-val {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #93c5fd;
+  line-height: 1.2;
+}
+
+.lb-stat-label {
+  font-size: 0.55rem;
+  color: rgba(147,197,253,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lb-gap {
+  text-align: center;
+  color: rgba(255,255,255,0.2);
+  font-size: 0.85rem;
+  padding: 0.4rem 0;
+  letter-spacing: 0.1em;
+}

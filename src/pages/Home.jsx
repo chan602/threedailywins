@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { auth, db } from '../firebase'
 import { signOut, deleteUser } from 'firebase/auth'
 import {
   doc, onSnapshot,
-  setDoc, getDoc, collection, getDocs, query, orderBy, deleteDoc, writeBatch
+  setDoc, getDoc, collection, getDocs, query, where, orderBy, deleteDoc, writeBatch
 } from 'firebase/firestore'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -79,6 +80,7 @@ function isThreeWinDay(w) {
 function Home() {
   const user = auth.currentUser
   const uid = user?.uid
+  const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState('today')
   const [activeNav, setActiveNav] = useState('home')
@@ -113,6 +115,15 @@ function Home() {
   // Streak state
   const [streak, setStreak] = useState({ current: 0, total: 0, best: 0 })
   const [streakPopupOpen, setStreakPopupOpen] = useState(false)
+
+  // Friends search state
+  const [friendSearch, setFriendSearch] = useState('')
+  const [friendSearchError, setFriendSearchError] = useState('')
+
+  // Leaderboard state
+  const [lbTab, setLbTab] = useState('streak')        // 'streak' | 'wins'
+  const [lbEntries, setLbEntries] = useState([])
+  const [lbLoading, setLbLoading] = useState(false)
 
   // Profile / settings state
   const [editPhysical, setEditPhysical] = useState('')
@@ -276,6 +287,13 @@ function Home() {
       loadArchive()
     }
   }, [activeNav, uid])
+
+  // ── LOAD LEADERBOARD (when tab switches to leaderboard) ──
+  useEffect(() => {
+    if (activeNav === 'leaderboard') {
+      loadLeaderboard()
+    }
+  }, [activeNav])
 
   async function loadArchive() {
     setArchiveLoading(true)
@@ -516,6 +534,17 @@ Respond ONLY with valid JSON, no other text:
     }
 
     await setDoc(streakRef, { current, total, best, lastWinDate })
+
+    // Write public leaderboard entry
+    await setDoc(doc(db, 'leaderboard', uid), {
+      uid,
+      username: userProfile?.username || '',
+      photoURL: user?.photoURL || '',
+      current,
+      total,
+      best,
+      updatedAt: Date.now()
+    })
     // onSnapshot will update streak state automatically
   }
 
@@ -562,6 +591,37 @@ Respond ONLY with valid JSON, no other text:
       }
       setDeleteLoading(false)
     }
+  }
+
+  // ── FRIENDS SEARCH ───────────────────────────────────
+  async function searchUser() {
+    const trimmed = friendSearch.trim().toLowerCase()
+    if (!trimmed) return
+    setFriendSearchError('')
+    try {
+      const q = query(collection(db, 'users'), where('username', '==', trimmed))
+      const snap = await getDocs(q)
+      if (snap.empty) {
+        setFriendSearchError('No user found with that username.')
+        return
+      }
+      navigate(`/u/${trimmed}`)
+    } catch (e) {
+      setFriendSearchError('Something went wrong — try again.')
+    }
+  }
+
+  // ── LEADERBOARD ──────────────────────────────────────
+  async function loadLeaderboard() {
+    setLbLoading(true)
+    try {
+      const snap = await getDocs(collection(db, 'leaderboard'))
+      const entries = snap.docs.map(d => d.data())
+      setLbEntries(entries)
+    } catch (e) {
+      console.error('loadLeaderboard error:', e)
+    }
+    setLbLoading(false)
   }
 
   // ── ARCHIVE HELPERS ───────────────────────────────────
@@ -848,17 +908,148 @@ Respond ONLY with valid JSON, no other text:
 
         {/* ── FRIENDS PLACEHOLDER ── */}
         {activeNav === 'friends' && (
-          <div className="placeholder-screen">
-            <p className="placeholder-title">Friends</p>
-            <p className="placeholder-sub">Coming soon — add friends and see their daily wins.</p>
+          <div className="friends-screen">
+            <p className="friends-title">Find people</p>
+            <p className="friends-sub">Search by username to view someone's profile.</p>
+            <div className="friends-search-row">
+              <span className="friends-at">@</span>
+              <input
+                className="friends-input"
+                placeholder="username"
+                value={friendSearch}
+                onChange={e => { setFriendSearch(e.target.value); setFriendSearchError('') }}
+                onKeyDown={e => e.key === 'Enter' && searchUser()}
+              />
+              <button className="friends-search-btn" onClick={searchUser}>Go</button>
+            </div>
+            {friendSearchError && <p className="friends-error">{friendSearchError}</p>}
+            <div className="friends-divider" />
+            <p className="friends-coming-soon">Friend requests and a friends list are coming soon.</p>
           </div>
         )}
 
         {/* ── LEADERBOARD PLACEHOLDER ── */}
         {activeNav === 'leaderboard' && (
-          <div className="placeholder-screen">
-            <p className="placeholder-title">Leaderboard</p>
-            <p className="placeholder-sub">Coming soon — see who's on the longest streak.</p>
+          <div className="lb-screen">
+
+            {/* Sub-tabs */}
+            <div className="lb-tabs">
+              <button
+                className={`lb-tab ${lbTab === 'streak' ? 'active' : ''}`}
+                onClick={() => setLbTab('streak')}
+              >Streak</button>
+              <button
+                className={`lb-tab ${lbTab === 'wins' ? 'active' : ''}`}
+                onClick={() => setLbTab('wins')}
+              >Total Wins</button>
+              <button
+                className={`lb-tab ${lbTab === 'friends' ? 'active' : ''}`}
+                onClick={() => setLbTab('friends')}
+              >Friends</button>
+            </div>
+
+            {/* Friends placeholder */}
+            {lbTab === 'friends' && (
+              <div className="lb-coming-soon">
+                <p>Friend leaderboard coming soon.</p>
+              </div>
+            )}
+
+            {/* Global leaderboard */}
+            {(lbTab === 'streak' || lbTab === 'wins') && (
+              <>
+                {lbLoading && <p className="empty-msg">Loading…</p>}
+                {!lbLoading && (() => {
+                  const sorted = [...lbEntries].sort((a, b) => {
+                    if (lbTab === 'streak') {
+                      return (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0)
+                    } else {
+                      return (b.total ?? 0) - (a.total ?? 0) || (b.current ?? 0) - (a.current ?? 0)
+                    }
+                  })
+
+                  // Find own rank
+                  const ownRank = sorted.findIndex(e => e.uid === uid) + 1
+                  // Show top 50, always include self if outside top 50
+                  const top = sorted.slice(0, 50)
+                  const selfEntry = sorted.find(e => e.uid === uid)
+                  const selfInTop = top.some(e => e.uid === uid)
+
+                  return (
+                    <div className="lb-list">
+                      {top.length === 0 && (
+                        <p className="empty-msg">No entries yet — evaluate your wins to appear here.</p>
+                      )}
+                      {top.map((entry, i) => {
+                        const isMe = entry.uid === uid
+                        const rank = i + 1
+                        return (
+                          <div
+                            key={entry.uid}
+                            className={`lb-row ${isMe ? 'me' : ''}`}
+                            onClick={() => entry.username && navigate(`/u/${entry.username}`)}
+                          >
+                            <span className={`lb-rank ${rank <= 3 ? 'top' : ''}`}>
+                              {rank === 1 ? '1' : rank === 2 ? '2' : rank === 3 ? '3' : rank}
+                            </span>
+                            <div className="lb-avatar">
+                              {entry.photoURL
+                                ? <img src={entry.photoURL} alt="" className="profile-avatar-img" />
+                                : <span className="profile-avatar-initial">
+                                    {(entry.username || '?')[0].toUpperCase()}
+                                  </span>
+                              }
+                            </div>
+                            <span className="lb-username">
+                              @{entry.username || '—'}
+                              {isMe && <span className="lb-you"> you</span>}
+                            </span>
+                            <div className="lb-stats">
+                              <span className="lb-stat-val">{entry.current ?? 0}</span>
+                              <span className="lb-stat-label">streak</span>
+                            </div>
+                            <div className="lb-stats">
+                              <span className="lb-stat-val">{entry.total ?? 0}</span>
+                              <span className="lb-stat-label">wins</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {/* Show own row outside top 50 */}
+                      {!selfInTop && selfEntry && (
+                        <>
+                          <div className="lb-gap">···</div>
+                          <div className="lb-row me">
+                            <span className="lb-rank">{ownRank}</span>
+                            <div className="lb-avatar">
+                              {selfEntry.photoURL
+                                ? <img src={selfEntry.photoURL} alt="" className="profile-avatar-img" />
+                                : <span className="profile-avatar-initial">
+                                    {(selfEntry.username || '?')[0].toUpperCase()}
+                                  </span>
+                              }
+                            </div>
+                            <span className="lb-username">
+                              @{selfEntry.username || '—'}
+                              <span className="lb-you"> you</span>
+                            </span>
+                            <div className="lb-stats">
+                              <span className="lb-stat-val">{selfEntry.current ?? 0}</span>
+                              <span className="lb-stat-label">streak</span>
+                            </div>
+                            <div className="lb-stats">
+                              <span className="lb-stat-val">{selfEntry.total ?? 0}</span>
+                              <span className="lb-stat-label">wins</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
+              </>
+            )}
           </div>
         )}
 

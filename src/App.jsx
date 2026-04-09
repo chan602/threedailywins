@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 import Home from './pages/Home'
 import ProtectedRoute from './components/ProtectedRoute'
+import UserProfile from './pages/UserProfile'
 import './App.css'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
             <Home />
           </ProtectedRoute>
         } />
+        <Route path="/u/:username" element={<UserProfile />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>
