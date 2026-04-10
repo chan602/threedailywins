@@ -2244,3 +2244,65 @@ body {
   width: 20px;
   height: 20px;
 }
+
+/* ── INLINE TASK EDITING ── */
+.task-edit-input {
+  flex: 1;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.88rem;
+  border-radius: 6px;
+}
+
+/* ── ARCHIVE EDITING ── */
+.archive-check-btn {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--check-border);
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.archive-check-btn.done {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.archive-add-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.archive-cancel-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.archive-add-task-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.4rem 0;
+  margin-top: 0.25rem;
+  display: block;
+  transition: color 0.2s;
+}
+.archive-add-task-btn:hover { color: var(--accent); }
+
+/* ── USER PROFILE BIO ── */
+.upro-bio {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 0.35rem;
+}

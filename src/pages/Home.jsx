@@ -143,6 +143,18 @@ function Home() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  // Inline task editing state
+  const [editingTaskId, setEditingTaskId] = useState(null)
+  const [editingTaskText, setEditingTaskText] = useState('')
+
+  // Bio state
+  const [editBio, setEditBio] = useState('')
+  const [bioSaved, setBioSaved] = useState(false)
+
+  // Archive editing state
+  const [editingArchiveDay, setEditingArchiveDay] = useState(null)
+  const [archiveAddInput, setArchiveAddInput] = useState('')
+
   // Override comment state — keyed by win type
   const [overrideComments, setOverrideComments] = useState({ physical: '', mental: '', spiritual: '' })
   const [overrideOpen, setOverrideOpen] = useState({ physical: false, mental: false, spiritual: false })
@@ -189,6 +201,7 @@ function Home() {
         setEditSpiritual(data.winsDefinition?.spiritual || '')
         setVisTodo(data.visibility?.todo || 'friends')
         setVisStats(data.visibility?.stats || 'public')
+        setEditBio(data.bio || '')
       }
     })
   }, [uid])
@@ -690,6 +703,67 @@ Respond ONLY with valid JSON, no other text:
     setTimeout(() => setVisSaved(false), 2500)
   }
 
+  async function saveBio() {
+    if (!uid) return
+    const updated = { ...userProfile, bio: editBio.trim().slice(0, 1000) }
+    await setDoc(doc(db, 'users', uid), updated)
+    setUserProfile(updated)
+    setBioSaved(true)
+    setTimeout(() => setBioSaved(false), 2500)
+  }
+
+  async function saveTaskEdit(type, id) {
+    if (!editingTaskText.trim()) return
+    if (type === 'today') {
+      const updated = todayTasks.map(t => t.id === id ? { ...t, text: editingTaskText.trim() } : t)
+      await setDoc(todayRef, { tasks: updated, date: todayStr() })
+    } else if (type === 'tomorrow') {
+      const updated = tomorrowTasks.map(t => t.id === id ? { ...t, text: editingTaskText.trim() } : t)
+      await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
+    } else if (type === 'weekly') {
+      const updated = weeklyTasks.map(t => t.id === id ? { ...t, text: editingTaskText.trim() } : t)
+      await setDoc(weekRef, { tasks: updated, weekKey: weekKey() })
+    }
+    setEditingTaskId(null)
+    setEditingTaskText('')
+  }
+
+  async function updateArchiveTask(date, taskId, changes) {
+    const day = archiveDays.find(d => d.date === date)
+    if (!day) return
+    const updated = day.tasks.map(t => t.id === taskId ? { ...t, ...changes } : t)
+    const done = updated.filter(t => t.done).length
+    const newDay = { ...day, tasks: updated, summary: `${done}/${updated.length} completed` }
+    await setDoc(doc(db, 'archive', uid, 'days', date), newDay)
+    setArchiveDays(prev => prev.map(d => d.date === date ? newDay : d))
+  }
+
+  async function deleteArchiveTask(date, taskId) {
+    const day = archiveDays.find(d => d.date === date)
+    if (!day) return
+    const updated = day.tasks.filter(t => t.id !== taskId)
+    const done = updated.filter(t => t.done).length
+    const newDay = { ...day, tasks: updated, summary: `${done}/${updated.length} completed` }
+    await setDoc(doc(db, 'archive', uid, 'days', date), newDay)
+    setArchiveDays(prev => prev.map(d => d.date === date ? newDay : d))
+  }
+
+  async function addArchiveTask(date) {
+    if (!archiveAddInput.trim()) return
+    const day = archiveDays.find(d => d.date === date)
+    const existing = day?.tasks || []
+    const newTask = { id: uuidv4(), text: archiveAddInput.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
+    const updated = [...existing, newTask]
+    const done = updated.filter(t => t.done).length
+    const newDay = { ...(day || { date, archivedAt: Date.now() }), tasks: updated, summary: `${done}/${updated.length} completed` }
+    await setDoc(doc(db, 'archive', uid, 'days', date), newDay)
+    setArchiveDays(prev => {
+      const exists = prev.some(d => d.date === date)
+      return exists ? prev.map(d => d.date === date ? newDay : d) : [...prev, newDay].sort((a,b) => b.date.localeCompare(a.date))
+    })
+    setArchiveAddInput('')
+  }
+
   async function deleteAccount() {
     if (!uid) return
     setDeleteLoading(true)
@@ -700,6 +774,7 @@ Respond ONLY with valid JSON, no other text:
       // We delete the user doc — subcollections persist but are orphaned (clean up via Cloud Functions later)
       batch.delete(doc(db, 'users', uid))
       batch.delete(doc(db, 'streak', uid, 'data', 'current'))
+      batch.delete(doc(db, 'leaderboard', uid))
       await batch.commit()
       // Delete Firebase Auth account
       await deleteUser(auth.currentUser)
@@ -1068,15 +1143,22 @@ Respond ONLY with valid JSON, no other text:
 
             <div className="task-list">
               {todayTasks.length === 0 && <p className="empty-msg">No tasks yet</p>}
-              {todayTasks.map((t, i) => (
+              {[...todayTasks].sort((a,b) => a.done === b.done ? 0 : a.done ? 1 : -1).map((t, i) => (
                 <div key={t.id} className={`task-item ${t.done ? 'done' : ''}`}>
                   <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => toggleTask('today', t.id)} />
                   <span className="task-num">T{i + 1}</span>
-                  <span className="task-text">
-                    {t.text}
-                    {t.carried && <span className="tag carried-tag">carried</span>}
-                    {t.fromDTask && <span className="tag daily-tag">daily</span>}
-                  </span>
+                  {editingTaskId === t.id ? (
+                    <input className="task-input task-edit-input" value={editingTaskText}
+                      onChange={e => setEditingTaskText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveTaskEdit('today', t.id); if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') } }}
+                      onBlur={() => saveTaskEdit('today', t.id)} autoFocus />
+                  ) : (
+                    <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
+                      {t.text}
+                      {t.carried && <span className="tag carried-tag">carried</span>}
+                      {t.fromDTask && <span className="tag daily-tag">daily</span>}
+                    </span>
+                  )}
                   <button className="delete-btn" onClick={() => deleteTask('today', t.id)}>×</button>
                 </div>
               ))}
@@ -1183,11 +1265,18 @@ Respond ONLY with valid JSON, no other text:
             </div>
             <div className="task-list">
               {tomorrowTasks.length === 0 && <p className="empty-msg">Nothing queued</p>}
-              {tomorrowTasks.map((t, i) => (
+              {[...tomorrowTasks].sort((a,b) => a.done === b.done ? 0 : a.done ? 1 : -1).map((t, i) => (
                 <div key={t.id} className={`task-item ${t.done ? 'done' : ''}`}>
                   <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => toggleTask('tomorrow', t.id)} />
                   <span className="task-num">Tm{i + 1}</span>
-                  <span className="task-text">{t.text}</span>
+                  {editingTaskId === t.id ? (
+                    <input className="task-input task-edit-input" value={editingTaskText}
+                      onChange={e => setEditingTaskText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveTaskEdit('tomorrow', t.id); if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') } }}
+                      onBlur={() => saveTaskEdit('tomorrow', t.id)} autoFocus />
+                  ) : (
+                    <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>{t.text}</span>
+                  )}
                   <button className="delete-btn" onClick={() => deleteTask('tomorrow', t.id)}>×</button>
                 </div>
               ))}
@@ -1213,13 +1302,20 @@ Respond ONLY with valid JSON, no other text:
             </div>
             <div className="task-list">
               {weeklyTasks.length === 0 && <p className="empty-msg">No weekly goals</p>}
-              {weeklyTasks.map((t, i) => (
+              {[...weeklyTasks].sort((a,b) => a.done === b.done ? 0 : a.done ? 1 : -1).map((t, i) => (
                 <div key={t.id} className={`task-item ${t.done ? 'done' : ''}`}>
                   <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => toggleTask('weekly', t.id)} />
                   <span className="task-num">W{i + 1}</span>
-                  <span className="task-text">{t.text}
-                    {t.carried && <span className="tag carried-tag">carried</span>}
-                  </span>
+                  {editingTaskId === t.id ? (
+                    <input className="task-input task-edit-input" value={editingTaskText}
+                      onChange={e => setEditingTaskText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveTaskEdit('weekly', t.id); if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') } }}
+                      onBlur={() => saveTaskEdit('weekly', t.id)} autoFocus />
+                  ) : (
+                    <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
+                      {t.text}{t.carried && <span className="tag carried-tag">carried</span>}
+                    </span>
+                  )}
                   <button className="delete-btn" onClick={() => deleteTask('weekly', t.id)}>×</button>
                 </div>
               ))}
@@ -1591,6 +1687,25 @@ Respond ONLY with valid JSON, no other text:
               </div>
             </div>
 
+            {/* Bio */}
+            <div className="profile-section">
+              <p className="profile-section-title">About</p>
+              <p className="profile-section-sub">A short bio shown on your public profile.</p>
+              <textarea
+                className="profile-def-input"
+                value={editBio}
+                onChange={e => setEditBio(e.target.value.slice(0, 1000))}
+                rows={3}
+                placeholder="Tell people about yourself..."
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>{editBio.length}/1000</span>
+                <button className="profile-save-btn" style={{ width: 'auto', padding: '0.5rem 1rem' }} onClick={saveBio}>
+                  {bioSaved ? 'Saved!' : 'Save'}
+                </button>
+              </div>
+            </div>
+
             {/* Win definitions */}
             <div className="profile-section">
               <p className="profile-section-title">Win Definitions</p>
@@ -1840,12 +1955,39 @@ Respond ONLY with valid JSON, no other text:
                                   const winDot = winCat ? `win-dot-${winCat}` : ''
                                   return (
                                     <div key={i} className={`archive-task ${t.done ? 'done' : ''}`}>
-                                      <span className={`archive-task-dot ${t.done ? 'done' : ''}`} />
+                                      <button
+                                        className={`archive-check-btn ${t.done ? 'done' : ''}`}
+                                        onClick={() => updateArchiveTask(day.date, t.id, { done: !t.done })}
+                                      />
                                       {winCat && <span className={`archive-win-dot ${winDot}`} />}
                                       <span className="archive-task-text">{t.text}</span>
+                                      <button className="delete-btn" onClick={() => deleteArchiveTask(day.date, t.id)}>×</button>
                                     </div>
                                   )
                                 })}
+
+                                {editingArchiveDay === day.date ? (
+                                  <div className="archive-add-row">
+                                    <input
+                                      className="task-input"
+                                      placeholder="Add task..."
+                                      value={archiveAddInput}
+                                      onChange={e => setArchiveAddInput(e.target.value)}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter') addArchiveTask(day.date)
+                                        if (e.key === 'Escape') setEditingArchiveDay(null)
+                                      }}
+                                      autoFocus
+                                    />
+                                    <button className="add-btn" onClick={() => addArchiveTask(day.date)}>+</button>
+                                    <button className="archive-cancel-btn" onClick={() => setEditingArchiveDay(null)}>✕</button>
+                                  </div>
+                                ) : (
+                                  <button className="archive-add-task-btn" onClick={() => { setEditingArchiveDay(day.date); setArchiveAddInput('') }}>
+                                    + Add task
+                                  </button>
+                                )}
+
                                 {dayWins?.reasoning && (
                                   <p className="archive-reasoning">{dayWins.reasoning}</p>
                                 )}

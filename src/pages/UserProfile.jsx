@@ -159,7 +159,7 @@ function UserProfile() {
   if (loading) {
     return (
       <div className="upro-shell">
-        <button className="upro-back" onClick={() => navigate(-1)}>← Back</button>
+        <button className="upro-back" onClick={() => navigate(auth.currentUser ? -1 : '/login')}>← Back</button>
         <p className="upro-loading">Loading…</p>
       </div>
     )
@@ -168,7 +168,7 @@ function UserProfile() {
   if (notFound) {
     return (
       <div className="upro-shell">
-        <button className="upro-back" onClick={() => navigate(-1)}>← Back</button>
+        <button className="upro-back" onClick={() => navigate(auth.currentUser ? -1 : '/login')}>← Back</button>
         <p className="upro-not-found">No user found with username <strong>@{username}</strong>.</p>
       </div>
     )
@@ -184,7 +184,7 @@ function UserProfile() {
     <div className="upro-shell">
 
       {/* Back */}
-      <button className="upro-back" onClick={() => navigate(-1)}>← Back</button>
+      <button className="upro-back" onClick={() => navigate(auth.currentUser ? -1 : '/login')}>← Back</button>
 
       {/* Identity */}
       <div className="upro-identity">
@@ -199,6 +199,7 @@ function UserProfile() {
         <div>
           <p className="upro-username">@{profile?.username}</p>
           {isOwn && <p className="upro-own-badge">You</p>}
+          {profile?.bio && <p className="upro-bio">{profile.bio}</p>}
         </div>
       </div>
 
