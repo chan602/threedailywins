@@ -2208,3 +2208,39 @@ body {
   transition: opacity 0.2s;
 }
 .login-learn-more:hover { opacity: 0.75; }
+
+/* ── FRIENDS SHARE BUTTON ── */
+.friends-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.friends-header-row .friends-title { margin-bottom: 0.25rem; }
+.friends-header-row .friends-sub   { margin-bottom: 0; }
+
+.friends-share-btn {
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.friends-share-btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.friends-share-icon {
+  width: 20px;
+  height: 20px;
+}

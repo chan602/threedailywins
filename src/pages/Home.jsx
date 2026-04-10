@@ -1230,8 +1230,34 @@ Respond ONLY with valid JSON, no other text:
           <div className="friends-screen">
 
             {/* Search */}
-            <p className="friends-title">Find people</p>
-            <p className="friends-sub">Search by username to add as a friend.</p>
+            <div className="friends-header-row">
+              <div>
+                <p className="friends-title">Find people</p>
+                <p className="friends-sub">Search by username to add as a friend.</p>
+              </div>
+              <button
+                className="friends-share-btn"
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: 'threedailywins',
+                      text: 'Track your daily physical, mental, and spiritual wins.',
+                      url: 'https://threedailywins.com'
+                    }).catch(() => {})
+                  } else {
+                    navigator.clipboard.writeText('https://threedailywins.com')
+                    alert('Link copied to clipboard!')
+                  }
+                }}
+                title="Invite friends"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="friends-share-icon">
+                  <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/>
+                  <polyline points="16 6 12 2 8 6"/>
+                  <line x1="12" y1="2" x2="12" y2="15"/>
+                </svg>
+              </button>
+            </div>
             <div className="friends-search-row">
               <span className="friends-at">@</span>
               <input
