@@ -1815,16 +1815,26 @@ body {
 }
 
 .notif-panel {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  width: 300px;
+  position: fixed;
+  top: 60px;
+  right: 1rem;
+  width: min(300px, calc(100vw - 2rem));
   background: #0f1923;
   border: 0.5px solid rgba(255,255,255,0.12);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  z-index: 500;
+  z-index: 1000;
   overflow: hidden;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+/* Click-outside overlay */
+.notif-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: transparent;
 }
 
 .notif-panel-header {

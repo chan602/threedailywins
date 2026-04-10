@@ -932,6 +932,11 @@ Respond ONLY with valid JSON, no other text:
               {notifUnread && <span className="notif-dot" />}
             </button>
 
+            {/* Click-outside overlay */}
+            {notifOpen && (
+              <div className="notif-overlay" onClick={() => setNotifOpen(false)} />
+            )}
+
             {/* Notification panel */}
             {notifOpen && (
               <div className="notif-panel">
