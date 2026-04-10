@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { auth, db } from '../firebase'
 import { signOut, deleteUser } from 'firebase/auth'
 import {
   doc, onSnapshot,
-  setDoc, getDoc, collection, getDocs, query, where, orderBy, deleteDoc, writeBatch
+  setDoc, getDoc, collection, getDocs, query, where, deleteDoc, writeBatch
 } from 'firebase/firestore'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -156,10 +157,6 @@ function Home() {
   const [announcements, setAnnouncements] = useState([])  // stored in localStorage
   const [showPwaNotif, setShowPwaNotif] = useState(false)
 
-  // Notifications + PWA prompt state
-  const [announcement, setAnnouncement] = useState(null)   // { id, message } from Firestore
-  const [showAnnouncement, setShowAnnouncement] = useState(false)
-  const [showPwaPrompt, setShowPwaPrompt] = useState(false)
 
   // ── FIREBASE REFS ─────────────────────────────────────
   const todayRef = doc(db, 'tasks', uid, 'today', 'data')
@@ -185,36 +182,6 @@ function Home() {
       }
     })
   }, [uid])
-
-  // ── ANNOUNCEMENTS ────────────────────────────────────
-  useEffect(() => {
-    // Load broadcast announcement from Firestore
-    getDoc(doc(db, 'announcements', 'current')).then(snap => {
-      if (!snap.exists()) return
-      const data = snap.data()
-      if (!data.message || !data.id) return
-      // Check if user already dismissed this announcement
-      const dismissed = localStorage.getItem('dismissed_announcement')
-      if (dismissed !== data.id) {
-        setAnnouncement(data)
-        setShowAnnouncement(true)
-      }
-    }).catch(() => {}) // silently fail if no announcements doc yet
-  }, [])
-
-  // ── PWA INSTALL PROMPT ────────────────────────────────
-  useEffect(() => {
-    // Only show on mobile browsers, not when already installed as PWA
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-      || window.navigator.standalone === true
-    if (isStandalone) return
-
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-    if (!isMobile) return
-
-    const dismissed = localStorage.getItem('pwa_prompt_dismissed')
-    if (!dismissed) setShowPwaPrompt(true)
-  }, [])
 
   // ── NOTIFICATIONS ────────────────────────────────────
   useEffect(() => {
@@ -558,9 +525,10 @@ Respond ONLY with valid JSON, no other text:
     try {
       const response = await fetch(WORKER_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-    'X-App-Secret': '3w-app-2026-xk9m'   // ← add this line
-    },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-App-Secret': WORKER_SECRET
+        },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 400,
@@ -932,72 +900,71 @@ Respond ONLY with valid JSON, no other text:
               {notifUnread && <span className="notif-dot" />}
             </button>
 
-            {/* Click-outside overlay */}
-            {notifOpen && (
-              <div className="notif-overlay" onClick={() => setNotifOpen(false)} />
-            )}
-
-            {/* Notification panel */}
-            {notifOpen && (
-              <div className="notif-panel">
-                <div className="notif-panel-header">
-                  <span className="notif-panel-title">Notifications</span>
-                  <button className="notif-panel-close" onClick={() => setNotifOpen(false)}>✕</button>
-                </div>
-
-                {/* PWA prompt */}
-                {showPwaNotif && (
-                  <div className="notif-item notif-item-pwa">
-                    <div className="notif-item-body">
-                      <p className="notif-item-title">Add to home screen</p>
-                      <p className="notif-item-msg">
-                        You can install threedailywins as an app for quick access.
-                        {' '}
-                        {/iPhone|iPad|iPod/i.test(navigator.userAgent)
-                          ? 'On iPhone: tap the Share button, then "Add to Home Screen".'
-                          : /Android/i.test(navigator.userAgent)
-                            ? 'On Android: tap your browser menu, then "Add to Home Screen".'
-                            : 'On desktop: click the install icon in your browser address bar, or use the browser menu.'}
-                      </p>
-                    </div>
-                    <button className="notif-item-dismiss" onClick={dismissPwaNotif}>✕</button>
+            {/* Notification panel — rendered via portal to avoid layout bleed */}
+            {notifOpen && createPortal(
+              <>
+                <div className="notif-overlay" onClick={() => setNotifOpen(false)} />
+                <div className="notif-panel">
+                  <div className="notif-panel-header">
+                    <span className="notif-panel-title">Notifications</span>
+                    <button className="notif-panel-close" onClick={() => setNotifOpen(false)}>✕</button>
                   </div>
-                )}
 
-                {/* Friend requests */}
-                {incomingRequests.map(req => (
-                  <div key={req.id} className="notif-item notif-item-friend">
-                    <div className="notif-item-body">
-                      <p className="notif-item-title">Friend request</p>
-                      <p className="notif-item-msg">
-                        <span className="notif-username" onClick={() => { setNotifOpen(false); navigate(`/u/${req.username}`) }}>
-                          @{req.username}
-                        </span> wants to be friends.
-                      </p>
-                      <div className="notif-item-actions">
-                        <button className="friends-accept-btn" onClick={() => acceptRequest(req.uid, req.username, req.photoURL)}>Accept</button>
-                        <button className="friends-decline-btn" onClick={() => declineRequest(req.uid)}>Decline</button>
+                  {/* PWA prompt */}
+                  {showPwaNotif && (
+                    <div className="notif-item notif-item-pwa">
+                      <div className="notif-item-body">
+                        <p className="notif-item-title">Add to home screen</p>
+                        <p className="notif-item-msg">
+                          You can install threedailywins as an app for quick access.
+                          {' '}
+                          {/iPhone|iPad|iPod/i.test(navigator.userAgent)
+                            ? 'On iPhone: tap the Share button, then "Add to Home Screen".'
+                            : /Android/i.test(navigator.userAgent)
+                              ? 'On Android: tap your browser menu, then "Add to Home Screen".'
+                              : 'On desktop: click the install icon in your browser address bar, or use the browser menu.'}
+                        </p>
+                      </div>
+                      <button className="notif-item-dismiss" onClick={dismissPwaNotif}>✕</button>
+                    </div>
+                  )}
+
+                  {/* Friend requests */}
+                  {incomingRequests.map(req => (
+                    <div key={req.id} className="notif-item notif-item-friend">
+                      <div className="notif-item-body">
+                        <p className="notif-item-title">Friend request</p>
+                        <p className="notif-item-msg">
+                          <span className="notif-username" onClick={() => { setNotifOpen(false); navigate(`/u/${req.username}`) }}>
+                            @{req.username}
+                          </span> wants to be friends.
+                        </p>
+                        <div className="notif-item-actions">
+                          <button className="friends-accept-btn" onClick={() => acceptRequest(req.uid, req.username, req.photoURL)}>Accept</button>
+                          <button className="friends-decline-btn" onClick={() => declineRequest(req.uid)}>Decline</button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
 
-                {/* Announcements */}
-                {announcements.map(a => (
-                  <div key={a.id} className={`notif-item ${a.read ? '' : 'notif-item-unread'}`}>
-                    <div className="notif-item-body">
-                      <p className="notif-item-title">Announcement</p>
-                      <p className="notif-item-msg">{a.message}</p>
+                  {/* Announcements */}
+                  {announcements.map(a => (
+                    <div key={a.id} className={`notif-item ${a.read ? '' : 'notif-item-unread'}`}>
+                      <div className="notif-item-body">
+                        <p className="notif-item-title">Announcement</p>
+                        <p className="notif-item-msg">{a.message}</p>
+                      </div>
+                      <button className="notif-item-dismiss" onClick={() => dismissAnnouncement(a.id)}>✕</button>
                     </div>
-                    <button className="notif-item-dismiss" onClick={() => dismissAnnouncement(a.id)}>✕</button>
-                  </div>
-                ))}
+                  ))}
 
-                {/* Empty state */}
-                {!showPwaNotif && incomingRequests.length === 0 && announcements.length === 0 && (
-                  <p className="notif-empty">No notifications</p>
-                )}
-              </div>
+                  {/* Empty state */}
+                  {!showPwaNotif && incomingRequests.length === 0 && announcements.length === 0 && (
+                    <p className="notif-empty">No notifications</p>
+                  )}
+                </div>
+              </>,
+              document.body
             )}
           </div>
         </div>
@@ -1023,34 +990,6 @@ Respond ONLY with valid JSON, no other text:
         </div>}
       </div>
 
-      {/* ── ANNOUNCEMENT BANNER ── */}
-      {showAnnouncement && announcement && (
-        <div className="banner banner-announcement">
-          <span className="banner-msg">{announcement.message}</span>
-          <button className="banner-close" onClick={() => {
-            localStorage.setItem('dismissed_announcement', announcement.id)
-            setShowAnnouncement(false)
-          }}>✕</button>
-        </div>
-      )}
-
-      {/* ── PWA INSTALL PROMPT ── */}
-      {showPwaPrompt && (
-        <div className="banner banner-pwa">
-          <div className="banner-pwa-content">
-            <span className="banner-pwa-title">Add to home screen</span>
-            <span className="banner-pwa-sub">
-              {/iPhone|iPad|iPod/i.test(navigator.userAgent)
-                ? 'Tap the Share button, then "Add to Home Screen"'
-                : 'Tap your browser menu and select "Add to Home Screen"'}
-            </span>
-          </div>
-          <button className="banner-close" onClick={() => {
-            localStorage.setItem('pwa_prompt_dismissed', '1')
-            setShowPwaPrompt(false)
-          }}>✕</button>
-        </div>
-      )}
 
       {/* SUB-TABS — only shown on Home nav */}
       {activeNav === 'home' && (
