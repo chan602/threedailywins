@@ -1012,21 +1012,17 @@ Respond ONLY with valid JSON, no other text:
           <div className="stat-pill stat-pill-clickable" onClick={() => setRankPopupOpen(o => !o)} onMouseLeave={() => setRankPopupOpen(false)} style={{ position: 'relative' }}>
             <span className="stat-val">{globalRank ? `#${globalRank}` : '—'}</span>
             <span className="stat-label">rank</span>
-            {rankPopupOpen && createPortal(
-              <>
-                <div className="notif-overlay" onClick={() => setRankPopupOpen(false)} />
-                <div className="streak-popup" style={{ position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)' }}>
-                  <div className="streak-popup-row">
-                    <span className="streak-popup-label">Global</span>
-                    <span className="streak-popup-val">{globalRank ? `#${globalRank}` : '—'}</span>
-                  </div>
-                  <div className="streak-popup-row">
-                    <span className="streak-popup-label">Friends</span>
-                    <span className="streak-popup-val">{friendRank ? `#${friendRank}` : '—'}</span>
-                  </div>
+            {rankPopupOpen && (
+              <div className="streak-popup">
+                <div className="streak-popup-row">
+                  <span className="streak-popup-label">Global</span>
+                  <span className="streak-popup-val">{globalRank ? `#${globalRank}` : '—'}</span>
                 </div>
-              </>,
-              document.body
+                <div className="streak-popup-row">
+                  <span className="streak-popup-label">Friends</span>
+                  <span className="streak-popup-val">{friendRank ? `#${friendRank}` : '—'}</span>
+                </div>
+              </div>
             )}
           </div>
           <div className="stat-pill"><span className="stat-val">{streak.total}</span><span className="stat-label">total wins</span></div>
