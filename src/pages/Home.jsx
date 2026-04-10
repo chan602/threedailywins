@@ -151,6 +151,9 @@ function Home() {
   const [visStats, setVisStats] = useState('public')
   const [visSaved, setVisSaved] = useState(false)
 
+  // Theme state
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark')
+
   // Notification centre state
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifUnread, setNotifUnread] = useState(false)
@@ -166,6 +169,12 @@ function Home() {
   const rolloverRef = doc(db, 'meta', uid, 'rollover', 'data')
   const winsRef = doc(db, 'wins', uid, 'days', todayStr())
   const streakRef = doc(db, 'streak', uid, 'data', 'current')
+
+  // ── THEME ────────────────────────────────────────────
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
 
   // ── LOAD USER PROFILE ─────────────────────────────────
   useEffect(() => {
@@ -1611,6 +1620,23 @@ Respond ONLY with valid JSON, no other text:
               </div>
 
               {visSaved && <p className="vis-saved">Saved!</p>}
+            </div>
+
+            {/* Theme toggle */}
+            <div className="profile-section">
+              <p className="profile-section-title">Appearance</p>
+              <div className="theme-toggle-row">
+                <div className="vis-row-left">
+                  <span className="vis-label">Theme</span>
+                  <span className="vis-desc">{theme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
+                </div>
+                <button
+                  className={`theme-toggle-btn ${theme === 'light' ? 'light' : ''}`}
+                  onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+                >
+                  <span className="theme-toggle-thumb" />
+                </button>
+              </div>
             </div>
 
             {/* Sign out */}

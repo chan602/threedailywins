@@ -17,6 +17,9 @@
       (function() {
         var p = new URLSearchParams(window.location.search).get('p');
         if (p) history.replaceState(null, null, p);
+        // Apply saved theme before React mounts to prevent flash
+        var t = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
       })();
     </script>
   </head>
