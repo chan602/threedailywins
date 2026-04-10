@@ -116,6 +116,7 @@ function Home() {
   // Streak state
   const [streak, setStreak] = useState({ current: 0, total: 0, best: 0 })
   const [streakPopupOpen, setStreakPopupOpen] = useState(false)
+  const [rankPopupOpen, setRankPopupOpen] = useState(false)
 
   // Friends search state
   const [friendSearch, setFriendSearch] = useState('')
@@ -376,7 +377,11 @@ function Home() {
     }
   }, [activeNav, uid])
 
-  // ── LOAD LEADERBOARD (when tab switches to leaderboard) ──
+  // ── LOAD LEADERBOARD (on mount + when tab switches) ──
+  useEffect(() => {
+    loadLeaderboard()
+  }, [])
+
   useEffect(() => {
     if (activeNav === 'leaderboard') {
       loadLeaderboard()
@@ -891,6 +896,16 @@ Respond ONLY with valid JSON, no other text:
   ])
   const sortedWeekKeys = [...allWeekKeys].sort().reverse()
 
+  // ── RANK CALCULATIONS ────────────────────────────────
+  const sortedByStreak = [...lbEntries].sort((a, b) =>
+    (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0)
+  )
+  const globalRank = sortedByStreak.findIndex(e => e.uid === uid) + 1 || null
+
+  const friendUids = new Set([...friendsList.map(f => f.uid), uid])
+  const sortedFriends = sortedByStreak.filter(e => friendUids.has(e.uid))
+  const friendRank = sortedFriends.findIndex(e => e.uid === uid) + 1 || null
+
   return (
     <div className="home">
 
@@ -994,7 +1009,26 @@ Respond ONLY with valid JSON, no other text:
               </div>
             )}
           </div>
-          <div className="stat-pill"><span className="stat-val">—</span><span className="stat-label">rank</span></div>
+          <div className="stat-pill stat-pill-clickable" onClick={() => setRankPopupOpen(o => !o)} onMouseLeave={() => setRankPopupOpen(false)} style={{ position: 'relative' }}>
+            <span className="stat-val">{globalRank ? `#${globalRank}` : '—'}</span>
+            <span className="stat-label">rank</span>
+            {rankPopupOpen && createPortal(
+              <>
+                <div className="notif-overlay" onClick={() => setRankPopupOpen(false)} />
+                <div className="streak-popup" style={{ position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)' }}>
+                  <div className="streak-popup-row">
+                    <span className="streak-popup-label">Global</span>
+                    <span className="streak-popup-val">{globalRank ? `#${globalRank}` : '—'}</span>
+                  </div>
+                  <div className="streak-popup-row">
+                    <span className="streak-popup-label">Friends</span>
+                    <span className="streak-popup-val">{friendRank ? `#${friendRank}` : '—'}</span>
+                  </div>
+                </div>
+              </>,
+              document.body
+            )}
+          </div>
           <div className="stat-pill"><span className="stat-val">{streak.total}</span><span className="stat-label">total wins</span></div>
         </div>}
       </div>
