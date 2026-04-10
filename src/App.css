@@ -2183,3 +2183,28 @@ body {
   color: var(--text-faint);
   margin-top: 0.85rem;
 }
+
+/* ── LOGIN ABOUT SECTION ── */
+.login-about {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 0.5px solid var(--border-light);
+  text-align: center;
+}
+
+.login-about-text {
+  font-size: 0.82rem;
+  color: var(--text-faint);
+  line-height: 1.7;
+  margin-bottom: 0.85rem;
+  text-align: left;
+}
+
+.login-learn-more {
+  font-size: 0.82rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+.login-learn-more:hover { opacity: 0.75; }
