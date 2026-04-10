@@ -150,6 +150,17 @@ function Home() {
   const [visStats, setVisStats] = useState('public')
   const [visSaved, setVisSaved] = useState(false)
 
+  // Notification centre state
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifUnread, setNotifUnread] = useState(false)
+  const [announcements, setAnnouncements] = useState([])  // stored in localStorage
+  const [showPwaNotif, setShowPwaNotif] = useState(false)
+
+  // Notifications + PWA prompt state
+  const [announcement, setAnnouncement] = useState(null)   // { id, message } from Firestore
+  const [showAnnouncement, setShowAnnouncement] = useState(false)
+  const [showPwaPrompt, setShowPwaPrompt] = useState(false)
+
   // ── FIREBASE REFS ─────────────────────────────────────
   const todayRef = doc(db, 'tasks', uid, 'today', 'data')
   const tmrwRef = doc(db, 'tasks', uid, 'tomorrow', tomorrowStr())
@@ -174,6 +185,74 @@ function Home() {
       }
     })
   }, [uid])
+
+  // ── ANNOUNCEMENTS ────────────────────────────────────
+  useEffect(() => {
+    // Load broadcast announcement from Firestore
+    getDoc(doc(db, 'announcements', 'current')).then(snap => {
+      if (!snap.exists()) return
+      const data = snap.data()
+      if (!data.message || !data.id) return
+      // Check if user already dismissed this announcement
+      const dismissed = localStorage.getItem('dismissed_announcement')
+      if (dismissed !== data.id) {
+        setAnnouncement(data)
+        setShowAnnouncement(true)
+      }
+    }).catch(() => {}) // silently fail if no announcements doc yet
+  }, [])
+
+  // ── PWA INSTALL PROMPT ────────────────────────────────
+  useEffect(() => {
+    // Only show on mobile browsers, not when already installed as PWA
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true
+    if (isStandalone) return
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    if (!isMobile) return
+
+    const dismissed = localStorage.getItem('pwa_prompt_dismissed')
+    if (!dismissed) setShowPwaPrompt(true)
+  }, [])
+
+  // ── NOTIFICATIONS ────────────────────────────────────
+  useEffect(() => {
+    // Load stored announcement history from localStorage
+    const stored = JSON.parse(localStorage.getItem('notif_announcements') || '[]')
+    setAnnouncements(stored)
+
+    // Check Firestore for current announcement
+    getDoc(doc(db, 'announcements', 'current')).then(snap => {
+      if (!snap.exists()) return
+      const data = snap.data()
+      if (!data.message || !data.id) return
+      // Add to history if not already there
+      setAnnouncements(prev => {
+        const exists = prev.some(a => a.id === data.id)
+        if (exists) return prev
+        const updated = [{ id: data.id, message: data.message, time: Date.now(), read: false }, ...prev]
+        localStorage.setItem('notif_announcements', JSON.stringify(updated))
+        return updated
+      })
+    }).catch(() => {})
+
+    // PWA prompt — show if not already installed as standalone, and not dismissed
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true
+    const pwaDismissed = localStorage.getItem('pwa_notif_dismissed')
+    if (!isStandalone && !pwaDismissed) {
+      setShowPwaNotif(true)
+    }
+  }, [])
+
+  // Update unread dot whenever notif sources change
+  useEffect(() => {
+    const hasUnreadAnnouncement = announcements.some(a => !a.read)
+    const hasUnreadRequest = incomingRequests.length > 0
+    const hasUnreadPwa = showPwaNotif
+    setNotifUnread(hasUnreadAnnouncement || hasUnreadRequest || hasUnreadPwa)
+  }, [announcements, incomingRequests, showPwaNotif])
 
   // ── ROLLOVER ──────────────────────────────────────────
   useEffect(() => {
@@ -751,6 +830,30 @@ Respond ONLY with valid JSON, no other text:
     setLbLoading(false)
   }
 
+  // ── NOTIFICATION HELPERS ─────────────────────────────
+  function openNotifPanel() {
+    setNotifOpen(o => !o)
+    // Mark all announcements as read
+    setAnnouncements(prev => {
+      const updated = prev.map(a => ({ ...a, read: true }))
+      localStorage.setItem('notif_announcements', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  function dismissAnnouncement(id) {
+    setAnnouncements(prev => {
+      const updated = prev.filter(a => a.id !== id)
+      localStorage.setItem('notif_announcements', JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  function dismissPwaNotif() {
+    localStorage.setItem('pwa_notif_dismissed', '1')
+    setShowPwaNotif(false)
+  }
+
   // ── ARCHIVE HELPERS ───────────────────────────────────
   function toggleDay(date) {
     setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }))
@@ -818,6 +921,80 @@ Respond ONLY with valid JSON, no other text:
       <div className="home-header">
         <div className="home-nav">
           <span className="home-logo">threedailywins</span>
+
+          {/* Notification bell */}
+          <div className="notif-btn-wrap">
+            <button className="notif-btn" onClick={openNotifPanel}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="notif-icon">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              {notifUnread && <span className="notif-dot" />}
+            </button>
+
+            {/* Notification panel */}
+            {notifOpen && (
+              <div className="notif-panel">
+                <div className="notif-panel-header">
+                  <span className="notif-panel-title">Notifications</span>
+                  <button className="notif-panel-close" onClick={() => setNotifOpen(false)}>✕</button>
+                </div>
+
+                {/* PWA prompt */}
+                {showPwaNotif && (
+                  <div className="notif-item notif-item-pwa">
+                    <div className="notif-item-body">
+                      <p className="notif-item-title">Add to home screen</p>
+                      <p className="notif-item-msg">
+                        You can install threedailywins as an app for quick access.
+                        {' '}
+                        {/iPhone|iPad|iPod/i.test(navigator.userAgent)
+                          ? 'On iPhone: tap the Share button, then "Add to Home Screen".'
+                          : /Android/i.test(navigator.userAgent)
+                            ? 'On Android: tap your browser menu, then "Add to Home Screen".'
+                            : 'On desktop: click the install icon in your browser address bar, or use the browser menu.'}
+                      </p>
+                    </div>
+                    <button className="notif-item-dismiss" onClick={dismissPwaNotif}>✕</button>
+                  </div>
+                )}
+
+                {/* Friend requests */}
+                {incomingRequests.map(req => (
+                  <div key={req.id} className="notif-item notif-item-friend">
+                    <div className="notif-item-body">
+                      <p className="notif-item-title">Friend request</p>
+                      <p className="notif-item-msg">
+                        <span className="notif-username" onClick={() => { setNotifOpen(false); navigate(`/u/${req.username}`) }}>
+                          @{req.username}
+                        </span> wants to be friends.
+                      </p>
+                      <div className="notif-item-actions">
+                        <button className="friends-accept-btn" onClick={() => acceptRequest(req.uid, req.username, req.photoURL)}>Accept</button>
+                        <button className="friends-decline-btn" onClick={() => declineRequest(req.uid)}>Decline</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Announcements */}
+                {announcements.map(a => (
+                  <div key={a.id} className={`notif-item ${a.read ? '' : 'notif-item-unread'}`}>
+                    <div className="notif-item-body">
+                      <p className="notif-item-title">Announcement</p>
+                      <p className="notif-item-msg">{a.message}</p>
+                    </div>
+                    <button className="notif-item-dismiss" onClick={() => dismissAnnouncement(a.id)}>✕</button>
+                  </div>
+                ))}
+
+                {/* Empty state */}
+                {!showPwaNotif && incomingRequests.length === 0 && announcements.length === 0 && (
+                  <p className="notif-empty">No notifications</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         {activeNav !== 'profile' && <div className="home-stats">
           <div className="stat-pill stat-pill-clickable" onClick={() => setStreakPopupOpen(o => !o)} onMouseLeave={() => setStreakPopupOpen(false)} style={{ position: 'relative' }}>
@@ -840,6 +1017,35 @@ Respond ONLY with valid JSON, no other text:
           <div className="stat-pill"><span className="stat-val">{streak.total}</span><span className="stat-label">total wins</span></div>
         </div>}
       </div>
+
+      {/* ── ANNOUNCEMENT BANNER ── */}
+      {showAnnouncement && announcement && (
+        <div className="banner banner-announcement">
+          <span className="banner-msg">{announcement.message}</span>
+          <button className="banner-close" onClick={() => {
+            localStorage.setItem('dismissed_announcement', announcement.id)
+            setShowAnnouncement(false)
+          }}>✕</button>
+        </div>
+      )}
+
+      {/* ── PWA INSTALL PROMPT ── */}
+      {showPwaPrompt && (
+        <div className="banner banner-pwa">
+          <div className="banner-pwa-content">
+            <span className="banner-pwa-title">Add to home screen</span>
+            <span className="banner-pwa-sub">
+              {/iPhone|iPad|iPod/i.test(navigator.userAgent)
+                ? 'Tap the Share button, then "Add to Home Screen"'
+                : 'Tap your browser menu and select "Add to Home Screen"'}
+            </span>
+          </div>
+          <button className="banner-close" onClick={() => {
+            localStorage.setItem('pwa_prompt_dismissed', '1')
+            setShowPwaPrompt(false)
+          }}>✕</button>
+        </div>
+      )}
 
       {/* SUB-TABS — only shown on Home nav */}
       {activeNav === 'home' && (
