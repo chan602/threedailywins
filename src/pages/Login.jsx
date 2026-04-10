@@ -29,13 +29,39 @@ function Login() {
   }
 
   return (
-    <div className="auth-screen">
-      <div className="auth-card">
-        <h1>threedailywins</h1>
-        <p>Track your daily physical, mental, and spiritual wins.</p>
+    <div className="login-screen">
+      <div className="login-card">
+
+        {/* Icon + title */}
+        <div className="login-hero">
+          <img src="/icons/icon-192.png" alt="3W" className="login-icon" />
+          <h1 className="login-title">threedailywins</h1>
+          <p className="login-tagline">Your daily physical, mental, and spiritual wins — tracked, evaluated, and shared.</p>
+        </div>
+
+        {/* Feature list */}
+        <div className="login-features">
+          <div className="login-feature">
+            <span className="login-feature-dot physical" />
+            <span className="login-feature-text">Log daily tasks and track your progress</span>
+          </div>
+          <div className="login-feature">
+            <span className="login-feature-dot mental" />
+            <span className="login-feature-text">Claude AI evaluates your three daily wins</span>
+          </div>
+          <div className="login-feature">
+            <span className="login-feature-dot spiritual" />
+            <span className="login-feature-text">Compete on streaks with friends</span>
+          </div>
+        </div>
+
+        {/* Sign in */}
         <button className="google-btn" onClick={handleGoogleSignIn}>
           Continue with Google
         </button>
+
+        <p className="login-footer">Free to use · No ads</p>
+
       </div>
     </div>
   )
