@@ -17,10 +17,13 @@
       (function() {
         var p = new URLSearchParams(window.location.search).get('p');
         if (p) history.replaceState(null, null, p);
+        // Apply saved theme before React mounts to prevent flash
+        var t = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-D0QWh5OX.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-BIGlOPD6.css">
+    <script type="module" crossorigin src="/assets/index-CLxQ-H_N.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-YF2YooYR.css">
   </head>
   <body>
     <div id="root"></div>
