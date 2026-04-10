@@ -5,7 +5,7 @@ import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCdt0IF2zydGQIE21rGxm2WkyoyJHYed6s",
-  authDomain: "threedailywins.com",  // was: "threedailywins-401df.firebaseapp.com"
+  authDomain: "threedailywins-401df.firebaseapp.com",
   projectId: "threedailywins-401df",
   storageBucket: "threedailywins-401df.firebasestorage.app",
   messagingSenderId: "734565733098",
