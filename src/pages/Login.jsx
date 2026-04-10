@@ -120,7 +120,7 @@ function Login() {
           {signingIn ? 'Signing in…' : 'Continue with Google'}
         </button>
 
-        <p className="login-footer">Free to use · No ads</p>
+        <p className="login-footer">Free to use · No ads · Works best in Chrome</p>
 
         {/* Philosophy / about */}
         <div className="login-about">
