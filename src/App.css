@@ -772,9 +772,9 @@ body {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.archive-win-dot.win-dot-physical  { background: rgba(251,146,60,0.7); }
-.archive-win-dot.win-dot-mental    { background: rgba(147,197,253,0.7); }
-.archive-win-dot.win-dot-spiritual { background: rgba(167,139,250,0.7); }
+.archive-win-dot.win-dot-physical  { background: rgba(74,222,128,0.85); }   /* green — dumbbell */
+.archive-win-dot.win-dot-mental    { background: rgba(251,191,36,0.85); }   /* golden — book */
+.archive-win-dot.win-dot-spiritual { background: rgba(167,139,250,0.85); }  /* purple — lotus */
 
 .archive-task-text {
   font-size: 0.8rem;
@@ -2305,4 +2305,56 @@ body {
   color: var(--text-muted);
   line-height: 1.5;
   margin-top: 0.35rem;
+}
+
+/* ── WIN ROW ICONS ── */
+.win-row-label-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.win-row-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+/* ── WIN BADGE ICONS (archive headers) ── */
+.win-badge-icon {
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+/* ── ARCHIVE EVALUATE BUTTON ── */
+.archive-eval-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 0.5px solid var(--border-light);
+}
+
+.archive-eval-btn {
+  background: var(--accent-light);
+  border: 0.5px solid rgba(37,99,235,0.3);
+  color: var(--accent-text);
+  border-radius: 6px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.archive-eval-btn:hover:not(:disabled) {
+  background: rgba(37,99,235,0.25);
+}
+.archive-eval-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

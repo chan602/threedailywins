@@ -154,6 +154,7 @@ function Home() {
   // Archive editing state
   const [editingArchiveDay, setEditingArchiveDay] = useState(null)
   const [archiveAddInput, setArchiveAddInput] = useState('')
+  const [archiveEvalLoading, setArchiveEvalLoading] = useState(null)  // date string of day being evaluated
 
   // Override comment state — keyed by win type
   const [overrideComments, setOverrideComments] = useState({ physical: '', mental: '', spiritual: '' })
@@ -764,6 +765,64 @@ Respond ONLY with valid JSON, no other text:
     setArchiveAddInput('')
   }
 
+  async function evaluateArchiveDay(date, tasks) {
+    const completed = tasks.filter(t => t.done).map(t => t.text)
+    if (completed.length === 0) return
+
+    setArchiveEvalLoading(date)
+    const defs = userProfile?.winsDefinition || {}
+    const physDef = defs.physical || 'any meaningful movement — climbing, gym, run, MMA, workout, sports'
+    const mentDef = defs.mental || 'academic, professional, or goal-directed work — studying, researching, building, solving'
+    const spirDef = defs.spiritual || 'broad and personal — journaling, meditation, prayer, sleeping 9+ hours, meaningful conversation, reflection'
+
+    const prompt = `You are evaluating whether someone achieved their Three Wins on ${date} based on their completed tasks.
+
+Completed tasks:
+${completed.map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+Definitions (personal to the user):
+- Physical win: ${physDef}
+- Mental win: ${mentDef}
+- Spiritual win: ${spirDef}
+
+Note: routine hygiene tasks (shower, eat, etc.) should NOT count as wins and should map to null.
+For taskMap, assign each task to "physical", "mental", "spiritual", or null.
+
+Respond ONLY with valid JSON, no other text:
+{"physical": true or false, "mental": true or false, "spiritual": true or false, "reasoning": "one or two sentence explanation", "taskMap": {"task text": "physical"|"mental"|"spiritual"|null}}`
+
+    try {
+      const response = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Secret': WORKER_SECRET },
+        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
+      })
+      const data = await response.json()
+      const text = (data.content?.[0]?.text || '').replace(/```json|```/g, '').trim()
+      const result = JSON.parse(text)
+
+      const winsDoc = {
+        date,
+        physical: result.physical,
+        mental: result.mental,
+        spiritual: result.spiritual,
+        reasoning: result.reasoning || '',
+        taskMap: result.taskMap || {},
+        evaluatedAt: Date.now(),
+        overridePhysical: null,
+        overrideMental: null,
+        overrideSpiritual: null,
+      }
+      await setDoc(doc(db, 'wins', uid, 'days', date), winsDoc)
+      // Update winsCache in place so badges refresh without reloading
+      setWinsCache(prev => ({ ...prev, [date]: winsDoc }))
+      await updateStreak(winsDoc)
+    } catch (e) {
+      console.error('evaluateArchiveDay error:', e)
+    }
+    setArchiveEvalLoading(null)
+  }
+
   async function deleteAccount() {
     if (!uid) return
     setDeleteLoading(true)
@@ -935,16 +994,19 @@ Respond ONLY with valid JSON, no other text:
 
   // ── WIN BADGE COMPONENT ───────────────────────────────
   function WinBadge({ type, value, size = 'sm' }) {
-    const labels = { physical: 'P', mental: 'M', spiritual: 'S' }
     const achieved = value === true
     const missed = value === false
-    const pending = value == null
+    const iconSrc = `/icons/wins/${type}_${achieved ? 'achieved' : 'missed'}.png`
+    const opacity = value === null ? 0.2 : achieved ? 1 : 0.45
+    const iconSize = size === 'xs' ? 18 : 22
     return (
-      <span className={`win-badge win-badge-${type} ${achieved ? 'achieved' : missed ? 'missed' : 'pending'} ${size}`}>
-        <span className="win-badge-dot" />
-        <span className="win-badge-label">{labels[type]}</span>
-        <span className="win-badge-tick">{achieved ? '✓' : missed ? '✗' : '–'}</span>
-      </span>
+      <img
+        src={iconSrc}
+        alt={type}
+        className="win-badge-icon"
+        style={{ width: iconSize, height: iconSize, opacity, borderRadius: 4, objectFit: 'cover' }}
+        title={`${type}: ${achieved ? 'Achieved' : missed ? 'Not detected' : 'Pending'}`}
+      />
     )
   }
 
@@ -1198,10 +1260,22 @@ Respond ONLY with valid JSON, no other text:
                 // Definition to show before eval
                 const def = userProfile?.winsDefinition?.[type] || ''
 
+                const iconState = effective === true ? 'achieved' : 'missed'
+                const iconSrc = `/icons/wins/${type}_${iconState}.png`
+                const iconOpacity = effective === null ? 0.25 : 1
+
                 return (
                   <div key={type} className={`win-row ${effective === true ? 'achieved' : effective === false ? 'missed' : 'pending'}`}>
                     <div className="win-row-top">
-                      <span className="win-row-label">{labels[type]}</span>
+                      <div className="win-row-label-group">
+                        <img
+                          src={iconSrc}
+                          alt={labels[type]}
+                          className="win-row-icon"
+                          style={{ opacity: iconOpacity }}
+                        />
+                        <span className="win-row-label">{labels[type]}</span>
+                      </div>
                       <div className="win-row-right">
                         <span className={`win-status-pill ${effective === true ? 'achieved' : effective === false ? 'missed' : 'pending'}`}>
                           {effective === true ? '✓ Achieved' : effective === false ? '✗ Not detected' : '– Pending'}
@@ -1991,9 +2065,22 @@ Respond ONLY with valid JSON, no other text:
                                 {dayWins?.reasoning && (
                                   <p className="archive-reasoning">{dayWins.reasoning}</p>
                                 )}
-                                {!dayWins && (
-                                  <p className="archive-not-evaluated">Not yet evaluated.</p>
-                                )}
+
+                                {/* Evaluate / Re-evaluate button */}
+                                <div className="archive-eval-row">
+                                  <button
+                                    className="archive-eval-btn"
+                                    onClick={() => evaluateArchiveDay(day.date, dayTasks)}
+                                    disabled={archiveEvalLoading === day.date || dayTasks.filter(t => t.done).length === 0}
+                                  >
+                                    {archiveEvalLoading === day.date
+                                      ? 'Evaluating…'
+                                      : dayWins?.evaluatedAt ? 'Re-evaluate' : 'Evaluate'}
+                                  </button>
+                                  {!dayWins && dayTasks.filter(t => t.done).length === 0 && (
+                                    <p className="archive-not-evaluated">Complete tasks to evaluate.</p>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
