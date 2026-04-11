@@ -995,17 +995,15 @@ Respond ONLY with valid JSON, no other text:
   // ── WIN BADGE COMPONENT ───────────────────────────────
   function WinBadge({ type, value, size = 'sm' }) {
     const achieved = value === true
-    const missed = value === false
     const iconSrc = `/icons/wins/${type}_${achieved ? 'achieved' : 'missed'}.png`
-    const opacity = value === null ? 0.2 : achieved ? 1 : 0.45
-    const iconSize = size === 'xs' ? 18 : 22
+    const iconSize = size === 'xs' ? 28 : 32
     return (
       <img
         src={iconSrc}
         alt={type}
         className="win-badge-icon"
-        style={{ width: iconSize, height: iconSize, opacity, borderRadius: 4, objectFit: 'cover' }}
-        title={`${type}: ${achieved ? 'Achieved' : missed ? 'Not detected' : 'Pending'}`}
+        style={{ width: iconSize, height: iconSize, borderRadius: 6, objectFit: 'cover' }}
+        title={`${type}: ${achieved ? 'Achieved' : value === false ? 'Not detected' : 'Pending'}`}
       />
     )
   }
@@ -1262,7 +1260,6 @@ Respond ONLY with valid JSON, no other text:
 
                 const iconState = effective === true ? 'achieved' : 'missed'
                 const iconSrc = `/icons/wins/${type}_${iconState}.png`
-                const iconOpacity = effective === null ? 0.25 : 1
 
                 return (
                   <div key={type} className={`win-row ${effective === true ? 'achieved' : effective === false ? 'missed' : 'pending'}`}>
@@ -1272,7 +1269,6 @@ Respond ONLY with valid JSON, no other text:
                           src={iconSrc}
                           alt={labels[type]}
                           className="win-row-icon"
-                          style={{ opacity: iconOpacity }}
                         />
                         <span className="win-row-label">{labels[type]}</span>
                       </div>

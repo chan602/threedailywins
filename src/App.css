@@ -616,7 +616,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   background: var(--bg-header);
   cursor: pointer;
   gap: 8px;
@@ -646,7 +646,8 @@ body {
 
 .archive-win-badges {
   display: flex;
-  gap: 3px;
+  gap: 5px;
+  align-items: center;
 }
 
 .archive-chevron {
@@ -714,7 +715,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.6rem 1rem;
+  padding: 0.7rem 1rem;
   cursor: pointer;
   gap: 8px;
   user-select: none;
@@ -2315,18 +2316,18 @@ body {
 }
 
 .win-row-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
   object-fit: cover;
   flex-shrink: 0;
-  transition: opacity 0.2s;
 }
 
 /* ── WIN BADGE ICONS (archive headers) ── */
 .win-badge-icon {
   flex-shrink: 0;
-  transition: opacity 0.2s;
+  border-radius: 6px;
+  object-fit: cover;
 }
 
 /* ── ARCHIVE EVALUATE BUTTON ── */
