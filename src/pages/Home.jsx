@@ -1781,7 +1781,9 @@ Respond ONLY with valid JSON, no other text:
               <p className="profile-section-title">Win Definitions</p>
               <p className="profile-section-sub">Used by Claude to evaluate your daily wins.</p>
 
-              <label className="profile-def-label">Physical</label>
+              <label className="profile-def-label">
+                <span className="profile-def-dot physical" />Physical
+              </label>
               <textarea
                 className="profile-def-input"
                 value={editPhysical}
@@ -1789,7 +1791,9 @@ Respond ONLY with valid JSON, no other text:
                 rows={2}
                 placeholder="e.g. Any workout, climb, or run"
               />
-              <label className="profile-def-label">Mental</label>
+              <label className="profile-def-label">
+                <span className="profile-def-dot mental" />Mental
+              </label>
               <textarea
                 className="profile-def-input"
                 value={editMental}
@@ -1797,7 +1801,9 @@ Respond ONLY with valid JSON, no other text:
                 rows={2}
                 placeholder="e.g. Study session, deep work"
               />
-              <label className="profile-def-label">Spiritual</label>
+              <label className="profile-def-label">
+                <span className="profile-def-dot spiritual" />Spiritual
+              </label>
               <textarea
                 className="profile-def-input"
                 value={editSpiritual}
@@ -1935,7 +1941,7 @@ Respond ONLY with valid JSON, no other text:
                   <div className="archive-week-header" onClick={() => toggleWeek(wk)}>
                     <div className="archive-week-left">
                       <span className="archive-week-title">{weekLabelFromKey(wk, weekData?.weekStart)}</span>
-                      {isThreeWinDay(weekWins) && <span className="three-wins-badge">Three Wins Week</span>}
+                      {isThreeWinDay(weekWins) && <img src="/icons/wins/3w_logo.png" alt="Three Wins Week" className="three-wins-logo" />}
                     </div>
                     <div className="archive-week-right">
                       <div className="archive-win-badges">
@@ -2006,7 +2012,7 @@ Respond ONLY with valid JSON, no other text:
                               <div className="archive-day-left">
                                 <span className={`archive-day-date ${threeWin ? 'three-win' : ''}`}>{dateLabel}</span>
                                 <span className="archive-day-meta">{done2}/{dayTasks.length} · {pct2}%</span>
-                                {threeWin && <span className="three-wins-badge">Three Wins</span>}
+                                {threeWin && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
                               </div>
                               <div className="archive-day-right">
                                 <div className="archive-win-badges">

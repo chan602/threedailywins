@@ -24,16 +24,18 @@ function getEffectiveWin(winsData, type) {
   return override != null ? override : winsData[type]
 }
 
-function WinBadge({ type, value }) {
-  const labels = { physical: 'P', mental: 'M', spiritual: 'S' }
+function WinBadge({ type, value, size = 'sm' }) {
   const achieved = value === true
-  const missed = value === false
+  const iconSrc = `/icons/wins/${type}_${achieved ? 'achieved' : 'missed'}.png`
+  const iconSize = size === 'xs' ? 28 : 32
   return (
-    <span className={`win-badge ${achieved ? 'achieved' : missed ? 'missed' : 'pending'} xs`}>
-      <span className="win-badge-dot" />
-      <span className="win-badge-label">{labels[type]}</span>
-      <span className="win-badge-tick">{achieved ? '✓' : missed ? '✗' : '–'}</span>
-    </span>
+    <img
+      src={iconSrc}
+      alt={type}
+      className="win-badge-icon"
+      style={{ width: iconSize, height: iconSize, borderRadius: 6, objectFit: 'cover' }}
+      title={`${type}: ${achieved ? 'Achieved' : value === false ? 'Not detected' : 'Pending'}`}
+    />
   )
 }
 
@@ -75,7 +77,7 @@ function UserProfile() {
   const [notFound, setNotFound] = useState(false)
   const [archiveDays, setArchiveDays] = useState(null)   // null = hidden, [] = empty, [...] = loaded
   const [archiveWins, setArchiveWins] = useState({})     // { [date]: winsDoc }
-  const [archiveOpen, setArchiveOpen] = useState(false)  // top-level expand
+  const [archiveOpen, setArchiveOpen] = useState(true)   // open by default
   const [expandedDays, setExpandedDays] = useState({})   // { [date]: bool }
   const [expandedWeeks, setExpandedWeeks] = useState({}) // { [weekKey]: bool }
 
@@ -230,12 +232,12 @@ function UserProfile() {
         <div className="upro-section-header">
           <span className="upro-section-title">Today</span>
           {todayTasks !== null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="upro-task-meta">{doneTasks}/{totalTasks} · {pct}%</span>
               {['physical', 'mental', 'spiritual'].map(type => (
-                <WinBadge key={type} type={type} value={getEffectiveWin(todayWins, type)} />
+                <WinBadge key={type} type={type} value={getEffectiveWin(todayWins, type)} size="xs" />
               ))}
-              {threeWinToday && <span className="three-wins-badge">Three Wins</span>}
+              {threeWinToday && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
             </div>
           )}
         </div>
@@ -350,16 +352,12 @@ function UserProfile() {
                                 <div className="archive-day-left">
                                   <span className={`archive-day-date ${threeWin ? 'three-win' : ''}`}>{dateLabel}</span>
                                   <span className="archive-day-meta">{done}/{dayTasks.length} · {pct2}%</span>
-                                  {threeWin && <span className="three-wins-badge">Three Wins</span>}
+                                  {threeWin && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
                                 </div>
                                 <div className="archive-day-right">
                                   <div className="archive-win-badges">
                                     {['physical', 'mental', 'spiritual'].map(type => (
-                                      <span key={type} className={`win-badge ${getEffectiveWin(dayWins, type) === true ? 'achieved' : getEffectiveWin(dayWins, type) === false ? 'missed' : 'pending'} xs`}>
-                                        <span className="win-badge-dot" />
-                                        <span className="win-badge-label">{type[0].toUpperCase()}</span>
-                                        <span className="win-badge-tick">{getEffectiveWin(dayWins, type) === true ? '✓' : getEffectiveWin(dayWins, type) === false ? '✗' : '–'}</span>
-                                      </span>
+                                      <WinBadge key={type} type={type} value={getEffectiveWin(dayWins, type)} size="xs" />
                                     ))}
                                   </div>
                                   <span className={`archive-chevron ${dayOpen ? 'open' : ''}`}>▼</span>
