@@ -555,9 +555,6 @@ function Home() {
       ...todayTasks.filter(t => t.done).map(t => t.text),
       ...weeklyTasks.filter(t => t.done).map(t => t.text)
     ]
-    const dTaskContext = dailyRepeats.length > 0
-      ? '\n\nDaily habits this week:\n' + dailyRepeats.map((t, i) => `D${i + 1}: ${t.text} — completed ${t.count || 0}/7 days`).join('\n')
-      : ''
 
     if (completed.length === 0) {
       setEvalError('No completed tasks to evaluate yet.')
@@ -575,7 +572,7 @@ function Home() {
     const prompt = `You are evaluating whether someone achieved their Three Wins today based on their completed tasks.
 
 Completed tasks today:
-${completed.map((t, i) => `${i + 1}. ${t}`).join('\n')}${dTaskContext}
+${completed.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
 Definitions (personal to the user):
 - Physical win: ${physDef}
