@@ -1953,58 +1953,57 @@ Respond ONLY with valid JSON, no other text:
                     </div>
                   </div>
 
-                  {/* Week body */}
-                  {weekOpen && (
+                  {/* Weekly tasks summary — only shown when week is expanded */}
+                  {weekOpen && weekData && (weekData.wTasks?.length > 0 || weekData.dTasks?.length > 0) && (
                     <div className="archive-week-body">
-
-                      {/* Weekly goals summary inside week */}
-                      {weekData && (weekData.wTasks?.length > 0 || weekData.dTasks?.length > 0) && (
-                        <div className="archive-week-summary">
-                          {weekData.dTasks?.length > 0 && (
-                            <div className="archive-week-section">
-                              <p className="archive-week-section-label">Daily Habits</p>
-                              {weekData.dTasks.map((t, i) => {
-                                const pct2 = Math.round(((t.count || 0) / 7) * 100)
-                                return (
-                                  <div key={i} className="archive-d-row">
-                                    <span className="archive-d-label">D{i + 1} — {t.text}</span>
-                                    <div className="archive-d-bar">
-                                      <div className="archive-d-bar-fill" style={{ width: `${pct2}%` }} />
-                                    </div>
-                                    <span className="archive-d-count">{t.count || 0}/7</span>
+                      <div className="archive-week-summary">
+                        {weekData.dTasks?.length > 0 && (
+                          <div className="archive-week-section">
+                            <p className="archive-week-section-label">Daily Habits</p>
+                            {weekData.dTasks.map((t, i) => {
+                              const pct2 = Math.round(((t.count || 0) / 7) * 100)
+                              return (
+                                <div key={i} className="archive-d-row">
+                                  <span className="archive-d-label">D{i + 1} — {t.text}</span>
+                                  <div className="archive-d-bar">
+                                    <div className="archive-d-bar-fill" style={{ width: `${pct2}%` }} />
                                   </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                          {weekData.wTasks?.length > 0 && (
-                            <div className="archive-week-section">
-                              <p className="archive-week-section-label">Weekly Goals</p>
-                              {weekData.wTasks.map((t, i) => (
-                                <div key={i} className={`archive-w-row ${t.done ? 'done' : ''}`}>
-                                  <span className={`archive-w-dot ${t.done ? 'done' : ''}`} />
-                                  <span className="archive-w-text">W{i + 1} — {t.text}</span>
+                                  <span className="archive-d-count">{t.count || 0}/7</span>
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                          {weekWins?.reasoning && (
-                            <p className="archive-reasoning">{weekWins.reasoning}</p>
-                          )}
-                        </div>
-                      )}
+                              )
+                            })}
+                          </div>
+                        )}
+                        {weekData.wTasks?.length > 0 && (
+                          <div className="archive-week-section">
+                            <p className="archive-week-section-label">Weekly Goals</p>
+                            {weekData.wTasks.map((t, i) => (
+                              <div key={i} className={`archive-w-row ${t.done ? 'done' : ''}`}>
+                                <span className={`archive-w-dot ${t.done ? 'done' : ''}`} />
+                                <span className="archive-w-text">W{i + 1} — {t.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {weekWins?.reasoning && (
+                          <p className="archive-reasoning">{weekWins.reasoning}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                      {/* Day rows */}
-                      {days.map(day => {
-                        const dayTasks = day.tasks || []
-                        const done2 = dayTasks.filter(t => t.done).length
-                        const pct2 = dayTasks.length > 0 ? Math.round(done2 / dayTasks.length * 100) : 0
-                        const dayWins = winsCache[day.date] || null
-                        const threeWin = isThreeWinDay(dayWins)
-                        const dayOpen = expandedDays[day.date]
-                        const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', {
-                          weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
-                        })
+                  {/* Day rows — always visible under week header */}
+                  <div className="archive-week-days">
+                  {days.map(day => {
+                    const dayTasks = day.tasks || []
+                    const done2 = dayTasks.filter(t => t.done).length
+                    const pct2 = dayTasks.length > 0 ? Math.round(done2 / dayTasks.length * 100) : 0
+                    const dayWins = winsCache[day.date] || null
+                    const threeWin = isThreeWinDay(dayWins)
+                    const dayOpen = expandedDays[day.date]
+                    const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', {
+                      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+                    })
 
                         return (
                           <div key={day.date} className={`archive-day ${threeWin ? 'three-win' : ''}`}>
@@ -2088,8 +2087,7 @@ Respond ONLY with valid JSON, no other text:
                           </div>
                         )
                       })}
-                    </div>
-                  )}
+                  </div>
                 </div>
               )
             })}
