@@ -520,6 +520,13 @@ body {
   font-style: italic;
 }
 
+.eval-scope-note {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  margin-bottom: 0.5rem;
+  opacity: 0.7;
+}
+
 .eval-error {
   font-size: 0.8rem;
   color: #f87171;

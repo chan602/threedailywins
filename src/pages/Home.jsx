@@ -558,10 +558,7 @@ function Home() {
   async function evaluateWins() {
     setEvalError('')
     setEvalFlash({})
-    const completed = [
-      ...todayTasks.filter(t => t.done).map(t => t.text),
-      ...weeklyTasks.filter(t => t.done).map(t => t.text)
-    ]
+    const completed = todayTasks.filter(t => t.done).map(t => t.text)
 
     if (completed.length === 0) {
       setEvalError('No completed tasks to evaluate yet.')
@@ -580,9 +577,9 @@ function Home() {
       ? 'Be strict — only award a win if the completed tasks clearly and directly match the definition. When in doubt, do not award the win.'
       : 'Be reasonable — if the completed tasks plausibly reflect the spirit of the definition, award the win. Give benefit of the doubt for close calls.'
 
-    const prompt = `You are evaluating whether someone achieved their Three Wins today based on their completed tasks.
+    const prompt = `You are evaluating whether someone achieved their Three Wins today based solely on their today to-do list. Do not infer or assume any activity not explicitly listed below.
 
-Completed tasks today:
+Completed tasks from today's to-do list:
 ${completed.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
 Definitions (personal to the user):
@@ -592,8 +589,7 @@ Definitions (personal to the user):
 
 Evaluation mode: ${modeInstruction}
 
-Note: routine hygiene tasks (shower, eat, etc.) should NOT count as wins and should map to null.
-Daily habits tapped today appear as completed tasks — treat them the same as any other completed task.
+Note: routine hygiene tasks (shower, eat, etc.) should NOT count as wins and should map to null. Only evaluate based on the tasks listed above — nothing else.
 For taskMap, assign each task to "physical", "mental", "spiritual", or null.
 
 Respond ONLY with valid JSON, no other text:
@@ -1370,6 +1366,7 @@ Respond ONLY with valid JSON, no other text:
                   {evalLoading ? 'Evaluating…' : todayWins?.evaluatedAt ? 'Re-evaluate' : 'Evaluate'}
                 </button>
               </div>
+              <p className="eval-scope-note">Evaluated from today's to-do list only.</p>
 
               {evalTime && (
                 <p className="eval-meta">Evaluated at {evalTime} · Powered by Claude AI</p>
