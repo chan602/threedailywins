@@ -190,6 +190,159 @@ body {
   flex-direction: column;
 }
 
+/* ── TUTORIAL ── */
+.tutorial-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.52);
+  z-index: 500;
+  pointer-events: none;
+}
+
+.tutorial-tooltip {
+  pointer-events: all;
+}
+
+.tutorial-highlight {
+  position: relative;
+  z-index: 501;
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 20px 4px rgba(37,99,235,0.45);
+  animation: tutorial-pulse 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes tutorial-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--accent), 0 0 20px 4px rgba(37,99,235,0.35); }
+  50%       { box-shadow: 0 0 0 3px var(--accent), 0 0 28px 8px rgba(37,99,235,0.55); }
+}
+
+.tutorial-tooltip {
+  position: absolute;
+  background: var(--bg-card);
+  border: 0.5px solid var(--border-light);
+  border-radius: 16px;
+  padding: 1.25rem 1.25rem 1rem;
+  width: calc(100% - 2.5rem);
+  max-width: 360px;
+  box-shadow: 0 4px 40px rgba(0,0,0,0.35);
+  transition: top 0.35s cubic-bezier(.4,0,.2,1), bottom 0.35s cubic-bezier(.4,0,.2,1), left 0.35s cubic-bezier(.4,0,.2,1), right 0.35s cubic-bezier(.4,0,.2,1);
+}
+
+/* Arrow pointer via ::before */
+.tutorial-tooltip::before {
+  content: '';
+  position: absolute;
+  border: 8px solid transparent;
+}
+
+/* Step 1 — bell (top right, arrow points up-right) */
+.tutorial-step-1 {
+  top: calc(5rem + env(safe-area-inset-top));
+  right: 1.25rem;
+  left: auto;
+}
+.tutorial-step-1::before {
+  top: -16px;
+  right: 18px;
+  left: auto;
+  border-bottom-color: var(--bg-card);
+}
+
+/* Step 2 — bottom nav (bottom, arrow points down) */
+.tutorial-step-2 {
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+}
+.tutorial-step-2::before {
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: var(--bg-card);
+}
+
+/* Step 3 — stat pills (below header, arrow points up) */
+.tutorial-step-3 {
+  top: calc(8.5rem + env(safe-area-inset-top));
+  left: 1.25rem;
+  right: auto;
+}
+.tutorial-step-3::before {
+  top: -16px;
+  left: 24px;
+  border-bottom-color: var(--bg-card);
+}
+
+/* Step 4 — eval panel (middle of screen) */
+.tutorial-step-4 {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.tutorial-step-4::before { display: none; }
+
+.tutorial-step-indicator {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 1rem;
+}
+
+.tutorial-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border-input);
+  transition: all 0.2s;
+}
+.tutorial-dot.active { background: var(--accent); width: 18px; border-radius: 3px; }
+.tutorial-dot.done   { background: var(--accent); opacity: 0.4; }
+
+.tutorial-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+
+.tutorial-body {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 1.1rem;
+}
+
+.tutorial-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tutorial-skip {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+.tutorial-skip:hover { color: var(--text-muted); }
+
+.tutorial-next {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.tutorial-next:hover { background: #1d4ed8; }
+
 .home * {
   text-align: left;
 }

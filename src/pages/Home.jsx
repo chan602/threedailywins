@@ -97,7 +97,10 @@ function Home() {
   const [weeklyInput, setWeeklyInput] = useState('')
   const [dailyInput, setDailyInput] = useState('')
 
-  // AI eval state
+  // Tutorial state
+  const [tutorialStep, setTutorialStep] = useState(0) // 0 = hidden, 1-4 = steps
+
+
   const [todayWins, setTodayWins] = useState(null) // { physical, mental, spiritual, reasoning, taskMap, evaluatedAt, overridePhysical, overrideMental, overrideSpiritual }
   const [evalLoading, setEvalLoading] = useState(false)
   const [evalError, setEvalError] = useState('')
@@ -215,6 +218,7 @@ function Home() {
         setVisTodo(data.visibility?.todo || 'friends')
         setVisStats(data.visibility?.stats || 'public')
         setEditBio(data.bio || '')
+        if (!data.hasSeenTutorial) setTutorialStep(1)
       }
     })
   }, [uid])
@@ -766,6 +770,23 @@ Respond ONLY with valid JSON, no other text:
     setTimeout(() => setBioSaved(false), 2500)
   }
 
+  function nextTutorialStep() {
+    if (tutorialStep < 4) {
+      setTutorialStep(s => s + 1)
+    } else {
+      dismissTutorial()
+    }
+  }
+
+  async function dismissTutorial() {
+    setTutorialStep(0)
+    if (uid && userProfile) {
+      const updated = { ...userProfile, hasSeenTutorial: true }
+      await setDoc(doc(db, 'users', uid), updated)
+      setUserProfile(updated)
+    }
+  }
+
   async function saveTaskEdit(type, id) {
     if (!editingTaskText.trim()) return
     if (type === 'today') {
@@ -1170,13 +1191,59 @@ Respond ONLY with valid JSON, no other text:
   return (
     <div className="home">
 
-      {/* HEADER */}
+      {/* ── TUTORIAL OVERLAY ── */}
+      {tutorialStep > 0 && (
+        <div className="tutorial-backdrop">
+          <div
+            className={`tutorial-tooltip tutorial-step-${tutorialStep}`}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="tutorial-step-indicator">
+              {[1,2,3,4].map(s => (
+                <span key={s} className={`tutorial-dot ${s === tutorialStep ? 'active' : s < tutorialStep ? 'done' : ''}`} />
+              ))}
+            </div>
+
+            {tutorialStep === 1 && (
+              <>
+                <p className="tutorial-title">🔔 Notifications</p>
+                <p className="tutorial-body">Tap the bell for friend requests, announcements, and install prompts.</p>
+              </>
+            )}
+            {tutorialStep === 2 && (
+              <>
+                <p className="tutorial-title">🧭 Navigate</p>
+                <p className="tutorial-body">Use the bottom bar to switch between Home, Archive, Friends, Ranks, and Profile.</p>
+              </>
+            )}
+            {tutorialStep === 3 && (
+              <>
+                <p className="tutorial-title">🔥 Your stats</p>
+                <p className="tutorial-body">Track your current streak, global rank, and total three-win days at a glance. Tap either pill for more detail.</p>
+              </>
+            )}
+            {tutorialStep === 4 && (
+              <>
+                <p className="tutorial-title">✨ Three Wins eval</p>
+                <p className="tutorial-body">Complete tasks in your today list, then tap Evaluate. Claude scores your physical, mental, and spiritual wins based only on what you did today.</p>
+              </>
+            )}
+
+            <div className="tutorial-actions">
+              <button className="tutorial-skip" onClick={dismissTutorial}>Skip</button>
+              <button className="tutorial-next" onClick={nextTutorialStep}>
+                {tutorialStep === 4 ? 'Got it!' : 'Next →'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="home-header">
         <div className="home-nav">
           <span className="home-logo">threedailywins</span>
 
           {/* Notification bell */}
-          <div className="notif-btn-wrap">
+          <div className={`notif-btn-wrap${tutorialStep === 1 ? ' tutorial-highlight' : ''}`}>
             <button className="notif-btn" onClick={openNotifPanel}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="notif-icon">
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -1253,7 +1320,7 @@ Respond ONLY with valid JSON, no other text:
             )}
           </div>
         </div>
-        {activeNav !== 'profile' && <div className="home-stats">
+        {activeNav !== 'profile' && <div className={`home-stats${tutorialStep === 3 ? ' tutorial-highlight' : ''}`}>
           <div className={`stat-pill stat-pill-clickable${isThreeWinDay(todayWins) ? ' stat-pill-win' : ''}`} onClick={() => setStreakPopupOpen(o => !o)} onMouseLeave={() => setStreakPopupOpen(false)} style={{ position: 'relative' }}>
             <span className="stat-val">{streak.current}</span>
             <span className="stat-label">streak</span>
@@ -1355,7 +1422,7 @@ Respond ONLY with valid JSON, no other text:
             </div>
 
             {/* ── AI WINS EVAL PANEL ── */}
-            <div className="wins-panel">
+            <div className={`wins-panel${tutorialStep === 4 ? ' tutorial-highlight' : ''}`}>
               <div className="wins-panel-header">
                 <span className="wins-panel-title">Three Wins</span>
                 <button
@@ -2286,7 +2353,7 @@ Respond ONLY with valid JSON, no other text:
       </div>
 
       {/* ── BOTTOM NAV ── */}
-      <nav className="bottom-nav">
+      <nav className={`bottom-nav${tutorialStep === 2 ? ' tutorial-highlight' : ''}`}>
         <button
           className={`bottom-nav-item ${activeNav === 'home' ? 'active' : ''}`}
           onClick={() => setActiveNav('home')}
