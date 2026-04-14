@@ -78,9 +78,9 @@ function isThreeWinDay(w) {
 }
 
 // ── MAIN COMPONENT ───────────────────────────────────────
-function Home() {
-  const user = auth.currentUser
-  const uid = user?.uid
+function Home({ isGuest = false }) {
+  const user = isGuest ? null : auth.currentUser
+  const uid = user?.uid || 'guest'
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState('today')
@@ -206,6 +206,25 @@ function Home() {
 
   // ── LOAD USER PROFILE ─────────────────────────────────
   useEffect(() => {
+    if (isGuest) {
+      setRolloverDone(true)
+      setTutorialStep(1)
+      // Seed demo tasks so guest can see how the app works
+      const id = () => Math.random().toString(36).slice(2)
+      setTodayTasks([
+        { id: id(), text: 'Run', done: false, carried: false, carryCount: 0, createdAt: Date.now() },
+        { id: id(), text: 'Study', done: false, carried: false, carryCount: 0, createdAt: Date.now() },
+        { id: id(), text: 'Journal', done: false, carried: false, carryCount: 0, createdAt: Date.now() },
+        { id: id(), text: 'Laundry', done: false, carried: false, carryCount: 0, createdAt: Date.now() },
+      ])
+      setWeeklyTasks([
+        { id: id(), text: 'Clean house', done: false, carried: false, carryCount: 0, createdAt: Date.now() },
+      ])
+      setDailyRepeats([
+        { id: id(), text: 'Send emails', count: 0, createdAt: Date.now() },
+      ])
+      return
+    }
     if (!uid) return
     getDoc(doc(db, 'users', uid)).then(snap => {
       if (snap.exists()) {
@@ -263,7 +282,7 @@ function Home() {
 
   // ── ROLLOVER ──────────────────────────────────────────
   useEffect(() => {
-    if (!uid) return
+    if (!uid || isGuest) return
     checkRollover()
   }, [uid])
 
@@ -387,7 +406,7 @@ function Home() {
 
   // ── LISTENERS ─────────────────────────────────────────
   useEffect(() => {
-    if (!uid || !rolloverDone) return
+    if (!uid || !rolloverDone || isGuest) return
     const unsub1 = onSnapshot(todayRef, snap => {
       setTodayTasks(snap.exists() ? (snap.data().tasks || []) : [])
     })
@@ -417,7 +436,7 @@ function Home() {
 
   // ── FRIENDS LISTENERS ────────────────────────────────
   useEffect(() => {
-    if (!uid) return
+    if (!uid || isGuest) return
     // Listen to incoming friend requests
     const reqRef = collection(db, 'friendRequests', uid, 'incoming')
     const unsubReq = onSnapshot(reqRef, snap => {
@@ -486,17 +505,20 @@ function Home() {
       if (!todayInput.trim()) return
       const task = { id: uuidv4(), text: todayInput.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
       setTodayInput('')
-      await setDoc(todayRef, { tasks: [...todayTasks, task], date: todayStr() })
+      if (isGuest) { setTodayTasks(prev => [...prev, task]) }
+      else await setDoc(todayRef, { tasks: [...todayTasks, task], date: todayStr() })
     } else if (activeTab === 'tomorrow') {
       if (!tomorrowInput.trim()) return
       const task = { id: uuidv4(), text: tomorrowInput.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
       setTomorrowInput('')
-      await setDoc(tmrwRef, { tasks: [...tomorrowTasks, task], date: tomorrowStr() })
+      if (isGuest) { setTomorrowTasks(prev => [...prev, task]) }
+      else await setDoc(tmrwRef, { tasks: [...tomorrowTasks, task], date: tomorrowStr() })
     } else if (activeTab === 'weekly') {
       if (!weeklyInput.trim()) return
       const task = { id: uuidv4(), text: weeklyInput.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
       setWeeklyInput('')
-      await setDoc(weekRef, { tasks: [...weeklyTasks, task], weekKey: weekKey() })
+      if (isGuest) { setWeeklyTasks(prev => [...prev, task]) }
+      else await setDoc(weekRef, { tasks: [...weeklyTasks, task], weekKey: weekKey() })
     }
     setAddFlash(true)
     setTimeout(() => setAddFlash(false), 400)
@@ -506,52 +528,72 @@ function Home() {
     if (!dailyInput.trim()) return
     const task = { id: uuidv4(), text: dailyInput.trim(), count: 0, createdAt: Date.now() }
     setDailyInput('')
+    if (isGuest) { setDailyRepeats(prev => [...prev, task]); return }
     await setDoc(dailyRef, { tasks: [...dailyRepeats, task], weekKey: weekKey() })
   }
 
   async function toggleTask(type, id) {
     if (type === 'today') {
       const updated = todayTasks.map(t => t.id === id ? { ...t, done: !t.done } : t)
+      if (isGuest) { setTodayTasks(updated); return }
       await setDoc(todayRef, { tasks: updated, date: todayStr() })
     } else if (type === 'tomorrow') {
       const updated = tomorrowTasks.map(t => t.id === id ? { ...t, done: !t.done } : t)
+      if (isGuest) { setTomorrowTasks(updated); return }
       await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
     } else if (type === 'weekly') {
       const updated = weeklyTasks.map(t => t.id === id ? { ...t, done: !t.done } : t)
+      if (isGuest) { setWeeklyTasks(updated); return }
       await setDoc(weekRef, { tasks: updated, weekKey: weekKey() })
     }
   }
 
   async function deleteTask(type, id) {
     if (type === 'today') {
-      await setDoc(todayRef, { tasks: todayTasks.filter(t => t.id !== id), date: todayStr() })
+      const updated = todayTasks.filter(t => t.id !== id)
+      if (isGuest) { setTodayTasks(updated); return }
+      await setDoc(todayRef, { tasks: updated, date: todayStr() })
     } else if (type === 'tomorrow') {
-      await setDoc(tmrwRef, { tasks: tomorrowTasks.filter(t => t.id !== id), date: tomorrowStr() })
+      const updated = tomorrowTasks.filter(t => t.id !== id)
+      if (isGuest) { setTomorrowTasks(updated); return }
+      await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
     } else if (type === 'weekly') {
-      await setDoc(weekRef, { tasks: weeklyTasks.filter(t => t.id !== id), weekKey: weekKey() })
+      const updated = weeklyTasks.filter(t => t.id !== id)
+      if (isGuest) { setWeeklyTasks(updated); return }
+      await setDoc(weekRef, { tasks: updated, weekKey: weekKey() })
     }
   }
 
   async function deleteDailyRepeat(id) {
-    await setDoc(dailyRef, { tasks: dailyRepeats.filter(t => t.id !== id), weekKey: weekKey() })
+    const updated = dailyRepeats.filter(t => t.id !== id)
+    if (isGuest) { setDailyRepeats(updated); return }
+    await setDoc(dailyRef, { tasks: updated, weekKey: weekKey() })
   }
 
   async function tapDailyRepeat(id) {
     const task = dailyRepeats.find(t => t.id === id)
     if (!task) return
     const updated = dailyRepeats.map(t => t.id === id ? { ...t, count: Math.min((t.count || 0) + 1, 7) } : t)
-    await setDoc(dailyRef, { tasks: updated, weekKey: weekKey() })
+    const entry = { id: uuidv4(), text: task.text, done: true, carried: false, carryCount: 0, fromDTask: true, createdAt: Date.now() }
     const alreadyIn = todayTasks.some(t => t.fromDTask && t.text === task.text)
-    if (!alreadyIn) {
-      const entry = { id: uuidv4(), text: task.text, done: true, carried: false, carryCount: 0, fromDTask: true, createdAt: Date.now() }
-      await setDoc(todayRef, { tasks: [...todayTasks, entry], date: todayStr() })
+    if (isGuest) {
+      setDailyRepeats(updated)
+      if (!alreadyIn) setTodayTasks(prev => [...prev, entry])
+      return
     }
+    await setDoc(dailyRef, { tasks: updated, weekKey: weekKey() })
+    if (!alreadyIn) await setDoc(todayRef, { tasks: [...todayTasks, entry], date: todayStr() })
   }
 
   async function untapDailyRepeat(id) {
     const task = dailyRepeats.find(t => t.id === id)
     if (!task || (task.count || 0) === 0) return
     const updated = dailyRepeats.map(t => t.id === id ? { ...t, count: Math.max((t.count || 0) - 1, 0) } : t)
+    if (isGuest) {
+      setDailyRepeats(updated)
+      if ((task.count || 0) - 1 === 0) setTodayTasks(prev => prev.filter(t => !(t.fromDTask && t.text === task.text)))
+      return
+    }
     await setDoc(dailyRef, { tasks: updated, weekKey: weekKey() })
     if ((task.count || 0) - 1 === 0) {
       await setDoc(todayRef, { tasks: todayTasks.filter(t => !(t.fromDTask && t.text === task.text)), date: todayStr() })
@@ -629,8 +671,12 @@ Respond ONLY with valid JSON, no other text:
         overrideSpiritual: todayWins?.overrideSpiritual ?? null,
       }
 
-      await setDoc(winsRef, winsDoc)
-      await updateStreak(winsDoc)
+      if (isGuest) {
+        setTodayWins(winsDoc)
+      } else {
+        await setDoc(winsRef, winsDoc)
+        await updateStreak(winsDoc)
+      }
       // Flash achieved win rows — persists until next eval
       const flash = {
         physical:  result.physical  === true,
@@ -780,7 +826,7 @@ Respond ONLY with valid JSON, no other text:
 
   async function dismissTutorial() {
     setTutorialStep(0)
-    if (uid && userProfile) {
+    if (!isGuest && uid && userProfile) {
       const updated = { ...userProfile, hasSeenTutorial: true }
       await setDoc(doc(db, 'users', uid), updated)
       setUserProfile(updated)
@@ -1357,6 +1403,14 @@ Respond ONLY with valid JSON, no other text:
         </div>}
       </div>
 
+      {/* Guest banner */}
+      {isGuest && (
+        <div className="guest-banner">
+          <span className="guest-banner-text">You're in guest mode — data won't be saved.</span>
+          <button className="guest-banner-btn" onClick={() => navigate('/login')}>Create account →</button>
+        </div>
+      )}
+
 
       {/* SUB-TABS — only shown on Home nav */}
       {activeNav === 'home' && (
@@ -1627,6 +1681,14 @@ Respond ONLY with valid JSON, no other text:
         {/* ── FRIENDS ── */}
         {activeNav === 'friends' && (
           <div className="friends-screen">
+            {isGuest ? (
+              <div className="guest-locked">
+                <p className="guest-locked-icon">👥</p>
+                <p className="guest-locked-title">Friends require an account</p>
+                <p className="guest-locked-body">Sign up to add friends, see their streaks, and compete on leaderboards.</p>
+                <button className="guest-locked-btn" onClick={() => navigate('/login')}>Create account</button>
+              </div>
+            ) : (<>
 
             {/* Search */}
             <div className="friends-header-row">
@@ -1763,12 +1825,21 @@ Respond ONLY with valid JSON, no other text:
               )}
             </div>
 
-          </div>
+          </>) }
+        </div>
         )}
 
         {/* ── LEADERBOARD PLACEHOLDER ── */}
         {activeNav === 'leaderboard' && (
           <div className="lb-screen">
+            {isGuest ? (
+              <div className="guest-locked">
+                <p className="guest-locked-icon">🏆</p>
+                <p className="guest-locked-title">Leaderboard requires an account</p>
+                <p className="guest-locked-body">Sign up to track your streak, rank globally, and compete with friends.</p>
+                <button className="guest-locked-btn" onClick={() => navigate('/login')}>Create account</button>
+              </div>
+            ) : (<>
 
             {/* Sub-tabs */}
             <div className="lb-tabs">
@@ -1924,6 +1995,7 @@ Respond ONLY with valid JSON, no other text:
                 })()}
               </>
             )}
+          </>) }
           </div>
         )}
 
@@ -2180,7 +2252,15 @@ Respond ONLY with valid JSON, no other text:
         {/* ── ARCHIVE ── */}
         {activeNav === 'archive' && (
           <div>
-            {archiveLoading && <p className="empty-msg">Loading archive…</p>}
+            {isGuest && (
+              <div className="guest-locked">
+                <p className="guest-locked-icon">🗄️</p>
+                <p className="guest-locked-title">Archive is unavailable in guest mode</p>
+                <p className="guest-locked-body">Create an account to automatically archive your days and track your history.</p>
+                <button className="guest-locked-btn" onClick={() => navigate('/login')}>Create account</button>
+              </div>
+            )}
+            {!isGuest && archiveLoading && <p className="empty-msg">Loading archive…</p>}
 
             {!archiveLoading && archiveDays.length === 0 && archiveWeeks.length === 0 && (
               <p className="empty-msg">No archive yet — days archive automatically at midnight.</p>

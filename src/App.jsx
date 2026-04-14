@@ -21,6 +21,7 @@ function App() {
             <Home />
           </ProtectedRoute>
         } />
+        <Route path="/guest" element={<Home isGuest={true} />} />
         <Route path="/u/:username" element={<UserProfile />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>

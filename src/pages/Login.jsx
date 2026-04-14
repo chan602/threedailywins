@@ -73,6 +73,13 @@ function Login() {
           {signingIn ? 'Signing in…' : 'Continue with Google'}
         </button>
 
+        <button
+          className="guest-btn"
+          onClick={() => navigate('/guest')}
+        >
+          Try without an account
+        </button>
+
         <p className="login-footer">Free to use · No ads · Works best in Chrome</p>
 
         {/* Philosophy / about */}
