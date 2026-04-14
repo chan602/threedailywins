@@ -661,10 +661,6 @@ body {
   background: var(--bg-card);
 }
 
-.archive-week-days {
-  background: var(--bg-card);
-}
-
 .archive-week-summary {
   padding: 0.75rem 1rem;
   border-bottom: 0.5px solid var(--border-light);
@@ -1124,6 +1120,24 @@ body {
 /* Danger zone */
 .profile-danger-zone {
   padding-bottom: 0.5rem;
+}
+
+.profile-danger-btn {
+  background: none;
+  border: 0.5px solid rgba(251,146,60,0.3);
+  color: rgba(251,146,60,0.7);
+  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+}
+
+.profile-danger-btn:hover:not(:disabled) {
+  background: rgba(251,146,60,0.08);
+  border-color: rgba(251,146,60,0.5);
+  color: rgba(251,146,60,0.9);
 }
 
 .profile-delete-btn {

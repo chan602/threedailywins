@@ -143,6 +143,14 @@ function Home() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  // Clear archive / reset state
+  const [clearArchiveConfirm, setClearArchiveConfirm] = useState(false)
+  const [clearArchiveLoading, setClearArchiveLoading] = useState(false)
+  const [resetConfirm, setResetConfirm] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
+  const [dataActionError, setDataActionError] = useState('')
+  const [dataActionSuccess, setDataActionSuccess] = useState('')
+
   // Inline task editing state
   const [editingTaskId, setEditingTaskId] = useState(null)
   const [editingTaskText, setEditingTaskText] = useState('')
@@ -335,6 +343,37 @@ function Home() {
 
     const newDTasks = dTasks.map(t => ({ ...t, count: 0 }))
     await setDoc(dailyRef, { tasks: newDTasks, weekKey: weekKey() })
+
+    // ── AUTO WEEKLY WIN CALCULATION ───────────────────────
+    // Build the 7 dates of the previous week (Mon–Sun)
+    const weekDates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(prevMon)
+      d.setDate(prevMon.getDate() + i)
+      return d.toLocaleDateString('en-CA')
+    })
+    // Fetch each day's wins doc in parallel
+    const dayWinsSnaps = await Promise.all(
+      weekDates.map(date => getDoc(doc(db, 'wins', uid, 'days', date)))
+    )
+    // Count days that had all 3 wins (respecting overrides)
+    const threeWinDayCount = dayWinsSnaps.filter(snap => {
+      if (!snap.exists()) return false
+      const w = snap.data()
+      const p = w.overridePhysical  != null ? w.overridePhysical  : w.physical
+      const m = w.overrideMental    != null ? w.overrideMental    : w.mental
+      const s = w.overrideSpiritual != null ? w.overrideSpiritual : w.spiritual
+      return p && m && s
+    }).length
+    const weekIsWin = threeWinDayCount >= 5
+    await setDoc(doc(db, 'wins', uid, 'weeks', prevKey), {
+      weekKey: prevKey,
+      physical:     weekIsWin,
+      mental:       weekIsWin,
+      spiritual:    weekIsWin,
+      threeWinDays: threeWinDayCount,
+      calculatedAt: Date.now()
+    })
+
     await setDoc(rolloverRef, { ...meta, lastWeekRollover: weekKey() })
   }
 
@@ -849,7 +888,80 @@ Respond ONLY with valid JSON, no other text:
     }
   }
 
-  // ── FRIENDS SEARCH ───────────────────────────────────
+  // ── CLEAR ARCHIVE ─────────────────────────────────────
+  async function clearArchive() {
+    if (!uid) return
+    setClearArchiveLoading(true)
+    setDataActionError('')
+    setDataActionSuccess('')
+    try {
+      const [daysSnap, weeksSnap, winDaysSnap, winWeeksSnap] = await Promise.all([
+        getDocs(collection(db, 'archive', uid, 'days')),
+        getDocs(collection(db, 'archive', uid, 'weeks')),
+        getDocs(collection(db, 'wins', uid, 'days')),
+        getDocs(collection(db, 'wins', uid, 'weeks')),
+      ])
+      const batch = writeBatch(db)
+      daysSnap.docs.forEach(d => batch.delete(d.ref))
+      weeksSnap.docs.forEach(d => batch.delete(d.ref))
+      winDaysSnap.docs.forEach(d => batch.delete(d.ref))
+      winWeeksSnap.docs.forEach(d => batch.delete(d.ref))
+      await batch.commit()
+      setArchiveDays([])
+      setArchiveWeeks([])
+      setWinsCache({})
+      setDataActionSuccess('Archive cleared.')
+      setClearArchiveConfirm(false)
+    } catch (e) {
+      console.error('clearArchive error:', e)
+      setDataActionError('Something went wrong — please try again.')
+    }
+    setClearArchiveLoading(false)
+  }
+
+  // ── RESET ALL DATA ────────────────────────────────────
+  async function resetAllData() {
+    if (!uid) return
+    setResetLoading(true)
+    setDataActionError('')
+    setDataActionSuccess('')
+    try {
+      const [daysSnap, weeksSnap, winDaysSnap, winWeeksSnap] = await Promise.all([
+        getDocs(collection(db, 'archive', uid, 'days')),
+        getDocs(collection(db, 'archive', uid, 'weeks')),
+        getDocs(collection(db, 'wins', uid, 'days')),
+        getDocs(collection(db, 'wins', uid, 'weeks')),
+      ])
+      const batch = writeBatch(db)
+      // Archive + wins
+      daysSnap.docs.forEach(d => batch.delete(d.ref))
+      weeksSnap.docs.forEach(d => batch.delete(d.ref))
+      winDaysSnap.docs.forEach(d => batch.delete(d.ref))
+      winWeeksSnap.docs.forEach(d => batch.delete(d.ref))
+      // Tasks
+      batch.delete(doc(db, 'tasks', uid, 'today', 'data'))
+      batch.delete(doc(db, 'tasks', uid, 'weekly', weekKey()))
+      batch.delete(doc(db, 'tasks', uid, 'dailyRepeat', weekKey()))
+      // Streak + leaderboard
+      batch.delete(doc(db, 'streak', uid, 'data', 'current'))
+      batch.delete(doc(db, 'leaderboard', uid))
+      await batch.commit()
+      // Reset local state
+      setArchiveDays([])
+      setArchiveWeeks([])
+      setWinsCache({})
+      setStreak({ current: 0, total: 0, best: 0 })
+      setTodayTasks([])
+      setWeeklyTasks([])
+      setDailyRepeats([])
+      setDataActionSuccess('All data reset.')
+      setResetConfirm(false)
+    } catch (e) {
+      console.error('resetAllData error:', e)
+      setDataActionError('Something went wrong — please try again.')
+    }
+    setResetLoading(false)
+  }
   async function searchUser() {
     const trimmed = friendSearch.trim().toLowerCase()
     if (!trimmed) return
@@ -1896,8 +2008,47 @@ Respond ONLY with valid JSON, no other text:
             {/* Delete account */}
             <div className="profile-section profile-danger-zone">
               <p className="profile-section-title danger">Danger zone</p>
+
+              {dataActionSuccess && <p className="profile-save-msg">{dataActionSuccess}</p>}
+              {dataActionError && <p className="eval-error">{dataActionError}</p>}
+
+              {/* Clear Archive */}
+              {!clearArchiveConfirm ? (
+                <button className="profile-danger-btn" onClick={() => { setClearArchiveConfirm(true); setResetConfirm(false); setDataActionError(''); setDataActionSuccess('') }}>
+                  Clear archive
+                </button>
+              ) : (
+                <div className="delete-confirm-box">
+                  <p className="delete-confirm-text">This deletes all archived days, weeks, and win evaluations. Tasks and streak are kept. Cannot be undone.</p>
+                  <div className="delete-confirm-actions">
+                    <button className="profile-delete-btn" onClick={clearArchive} disabled={clearArchiveLoading}>
+                      {clearArchiveLoading ? 'Clearing…' : 'Yes, clear archive'}
+                    </button>
+                    <button className="profile-cancel-btn" onClick={() => { setClearArchiveConfirm(false); setDataActionError('') }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Reset All Data */}
+              {!resetConfirm ? (
+                <button className="profile-danger-btn" style={{ marginTop: '0.5rem' }} onClick={() => { setResetConfirm(true); setClearArchiveConfirm(false); setDataActionError(''); setDataActionSuccess('') }}>
+                  Reset all data
+                </button>
+              ) : (
+                <div className="delete-confirm-box">
+                  <p className="delete-confirm-text">This deletes all tasks, archive, win evaluations, streak, and leaderboard entry. Your account is kept. Cannot be undone.</p>
+                  <div className="delete-confirm-actions">
+                    <button className="profile-delete-btn" onClick={resetAllData} disabled={resetLoading}>
+                      {resetLoading ? 'Resetting…' : 'Yes, reset all data'}
+                    </button>
+                    <button className="profile-cancel-btn" onClick={() => { setResetConfirm(false); setDataActionError('') }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Delete Account */}
               {!deleteConfirm ? (
-                <button className="profile-delete-btn" onClick={() => setDeleteConfirm(true)}>
+                <button className="profile-delete-btn" style={{ marginTop: '0.5rem' }} onClick={() => setDeleteConfirm(true)}>
                   Delete account
                 </button>
               ) : (
@@ -1932,7 +2083,7 @@ Respond ONLY with valid JSON, no other text:
               const weekData = archiveWeeks.find(w => w.weekKey === wk) || null
               const days = daysByWeek[wk] || []
               const weekWins = winsCache['week-' + wk] || null
-              const weekOpen = expandedWeeks[wk] !== false // default open
+              const weekOpen = expandedWeeks[wk] === true // default collapsed
 
               return (
                 <div key={wk} className="archive-week-group">
@@ -1992,8 +2143,7 @@ Respond ONLY with valid JSON, no other text:
                     </div>
                   )}
 
-                  {/* Day rows — always visible under week header */}
-                  <div className="archive-week-days">
+                  {/* Day rows — always visible */}
                   {days.map(day => {
                     const dayTasks = day.tasks || []
                     const done2 = dayTasks.filter(t => t.done).length
@@ -2005,89 +2155,88 @@ Respond ONLY with valid JSON, no other text:
                       weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
                     })
 
-                        return (
-                          <div key={day.date} className={`archive-day ${threeWin ? 'three-win' : ''}`}>
-                            <div className="archive-day-header" onClick={() => toggleDay(day.date)}>
-                              <div className="archive-day-left">
-                                <span className={`archive-day-date ${threeWin ? 'three-win' : ''}`}>{dateLabel}</span>
-                                <span className="archive-day-meta">{done2}/{dayTasks.length} · {pct2}%</span>
-                                {threeWin && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
-                              </div>
-                              <div className="archive-day-right">
-                                <div className="archive-win-badges">
-                                  {['physical', 'mental', 'spiritual'].map(type => (
-                                    <WinBadge key={type} type={type} value={getEffectiveWin(dayWins, type)} size="xs" />
-                                  ))}
-                                </div>
-                                <span className={`archive-chevron ${dayOpen ? 'open' : ''}`}>▼</span>
-                              </div>
-                            </div>
-
-                            {dayOpen && (
-                              <div className="archive-day-body">
-                                {dayTasks.map((t, i) => {
-                                  const winCat = dayWins?.taskMap?.[t.text]
-                                  const winDot = winCat ? `win-dot-${winCat}` : ''
-                                  return (
-                                    <div key={i} className={`archive-task ${t.done ? 'done' : ''}`}>
-                                      <button
-                                        className={`archive-check-btn ${t.done ? 'done' : ''}`}
-                                        onClick={() => updateArchiveTask(day.date, t.id, { done: !t.done })}
-                                      />
-                                      {winCat && <span className={`archive-win-dot ${winDot}`} />}
-                                      <span className="archive-task-text">{t.text}</span>
-                                      <button className="delete-btn" onClick={() => deleteArchiveTask(day.date, t.id)}>×</button>
-                                    </div>
-                                  )
-                                })}
-
-                                {editingArchiveDay === day.date ? (
-                                  <div className="archive-add-row">
-                                    <input
-                                      className="task-input"
-                                      placeholder="Add task..."
-                                      value={archiveAddInput}
-                                      onChange={e => setArchiveAddInput(e.target.value)}
-                                      onKeyDown={e => {
-                                        if (e.key === 'Enter') addArchiveTask(day.date)
-                                        if (e.key === 'Escape') setEditingArchiveDay(null)
-                                      }}
-                                      autoFocus
-                                    />
-                                    <button className="add-btn" onClick={() => addArchiveTask(day.date)}>+</button>
-                                    <button className="archive-cancel-btn" onClick={() => setEditingArchiveDay(null)}>✕</button>
-                                  </div>
-                                ) : (
-                                  <button className="archive-add-task-btn" onClick={() => { setEditingArchiveDay(day.date); setArchiveAddInput('') }}>
-                                    + Add task
-                                  </button>
-                                )}
-
-                                {dayWins?.reasoning && (
-                                  <p className="archive-reasoning">{dayWins.reasoning}</p>
-                                )}
-
-                                {/* Evaluate / Re-evaluate button */}
-                                <div className="archive-eval-row">
-                                  <button
-                                    className="archive-eval-btn"
-                                    onClick={() => evaluateArchiveDay(day.date, dayTasks)}
-                                    disabled={archiveEvalLoading === day.date || dayTasks.filter(t => t.done).length === 0}
-                                  >
-                                    {archiveEvalLoading === day.date
-                                      ? 'Evaluating…'
-                                      : dayWins?.evaluatedAt ? 'Re-evaluate' : 'Evaluate'}
-                                  </button>
-                                  {!dayWins && dayTasks.filter(t => t.done).length === 0 && (
-                                    <p className="archive-not-evaluated">Complete tasks to evaluate.</p>
-                                  )}
-                                </div>
-                              </div>
-                            )}
+                    return (
+                      <div key={day.date} className={`archive-day ${threeWin ? 'three-win' : ''}`}>
+                        <div className="archive-day-header" onClick={() => toggleDay(day.date)}>
+                          <div className="archive-day-left">
+                            <span className={`archive-day-date ${threeWin ? 'three-win' : ''}`}>{dateLabel}</span>
+                            <span className="archive-day-meta">{done2}/{dayTasks.length} · {pct2}%</span>
+                            {threeWin && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
                           </div>
-                        )
-                      })}
-                  </div>
+                          <div className="archive-day-right">
+                            <div className="archive-win-badges">
+                              {['physical', 'mental', 'spiritual'].map(type => (
+                                <WinBadge key={type} type={type} value={getEffectiveWin(dayWins, type)} size="xs" />
+                              ))}
+                            </div>
+                            <span className={`archive-chevron ${dayOpen ? 'open' : ''}`}>▼</span>
+                          </div>
+                        </div>
+
+                        {dayOpen && (
+                          <div className="archive-day-body">
+                            {dayTasks.map((t, i) => {
+                              const winCat = dayWins?.taskMap?.[t.text]
+                              const winDot = winCat ? `win-dot-${winCat}` : ''
+                              return (
+                                <div key={i} className={`archive-task ${t.done ? 'done' : ''}`}>
+                                  <button
+                                    className={`archive-check-btn ${t.done ? 'done' : ''}`}
+                                    onClick={() => updateArchiveTask(day.date, t.id, { done: !t.done })}
+                                  />
+                                  {winCat && <span className={`archive-win-dot ${winDot}`} />}
+                                  <span className="archive-task-text">{t.text}</span>
+                                  <button className="delete-btn" onClick={() => deleteArchiveTask(day.date, t.id)}>×</button>
+                                </div>
+                              )
+                            })}
+
+                            {editingArchiveDay === day.date ? (
+                              <div className="archive-add-row">
+                                <input
+                                  className="task-input"
+                                  placeholder="Add task..."
+                                  value={archiveAddInput}
+                                  onChange={e => setArchiveAddInput(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') addArchiveTask(day.date)
+                                    if (e.key === 'Escape') setEditingArchiveDay(null)
+                                  }}
+                                  autoFocus
+                                />
+                                <button className="add-btn" onClick={() => addArchiveTask(day.date)}>+</button>
+                                <button className="archive-cancel-btn" onClick={() => setEditingArchiveDay(null)}>✕</button>
+                              </div>
+                            ) : (
+                              <button className="archive-add-task-btn" onClick={() => { setEditingArchiveDay(day.date); setArchiveAddInput('') }}>
+                                + Add task
+                              </button>
+                            )}
+
+                            {dayWins?.reasoning && (
+                              <p className="archive-reasoning">{dayWins.reasoning}</p>
+                            )}
+
+                            {/* Evaluate / Re-evaluate button */}
+                            <div className="archive-eval-row">
+                              <button
+                                className="archive-eval-btn"
+                                onClick={() => evaluateArchiveDay(day.date, dayTasks)}
+                                disabled={archiveEvalLoading === day.date || dayTasks.filter(t => t.done).length === 0}
+                              >
+                                {archiveEvalLoading === day.date
+                                  ? 'Evaluating…'
+                                  : dayWins?.evaluatedAt ? 'Re-evaluate' : 'Evaluate'}
+                              </button>
+                              {!dayWins && dayTasks.filter(t => t.done).length === 0 && (
+                                <p className="archive-not-evaluated">Complete tasks to evaluate.</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
