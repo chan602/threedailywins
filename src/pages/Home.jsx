@@ -101,6 +101,8 @@ function Home() {
   const [todayWins, setTodayWins] = useState(null) // { physical, mental, spiritual, reasoning, taskMap, evaluatedAt, overridePhysical, overrideMental, overrideSpiritual }
   const [evalLoading, setEvalLoading] = useState(false)
   const [evalError, setEvalError] = useState('')
+  const [addFlash, setAddFlash] = useState(false)       // + button flash on task add
+  const [evalFlash, setEvalFlash] = useState({})        // { physical: true, mental: true, spiritual: true } after eval
 
   // Archive state
   const [archiveDays, setArchiveDays] = useState([])   // array of day docs
@@ -492,6 +494,8 @@ function Home() {
       setWeeklyInput('')
       await setDoc(weekRef, { tasks: [...weeklyTasks, task], weekKey: weekKey() })
     }
+    setAddFlash(true)
+    setTimeout(() => setAddFlash(false), 400)
   }
 
   async function addDailyRepeat() {
@@ -553,6 +557,7 @@ function Home() {
   // ── AI EVALUATION ─────────────────────────────────────
   async function evaluateWins() {
     setEvalError('')
+    setEvalFlash({})
     const completed = [
       ...todayTasks.filter(t => t.done).map(t => t.text),
       ...weeklyTasks.filter(t => t.done).map(t => t.text)
@@ -626,6 +631,13 @@ Respond ONLY with valid JSON, no other text:
 
       await setDoc(winsRef, winsDoc)
       await updateStreak(winsDoc)
+      // Flash achieved win rows — persists until next eval
+      const flash = {
+        physical:  result.physical  === true,
+        mental:    result.mental    === true,
+        spiritual: result.spiritual === true,
+      }
+      setEvalFlash(flash)
       // onSnapshot will update todayWins state automatically
     } catch (e) {
       console.error('evaluateWins error:', e)
@@ -1246,7 +1258,7 @@ Respond ONLY with valid JSON, no other text:
           </div>
         </div>
         {activeNav !== 'profile' && <div className="home-stats">
-          <div className="stat-pill stat-pill-clickable" onClick={() => setStreakPopupOpen(o => !o)} onMouseLeave={() => setStreakPopupOpen(false)} style={{ position: 'relative' }}>
+          <div className={`stat-pill stat-pill-clickable${isThreeWinDay(todayWins) ? ' stat-pill-win' : ''}`} onClick={() => setStreakPopupOpen(o => !o)} onMouseLeave={() => setStreakPopupOpen(false)} style={{ position: 'relative' }}>
             <span className="stat-val">{streak.current}</span>
             <span className="stat-label">streak</span>
             {streakPopupOpen && (
@@ -1316,7 +1328,7 @@ Respond ONLY with valid JSON, no other text:
                 onChange={e => setTodayInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addTask()}
               />
-              <button className="add-btn" onClick={addTask}>+</button>
+              <button className={`add-btn${addFlash ? ' add-btn-flash' : ''}`} onClick={addTask}>+</button>
             </div>
 
             <div className="task-list">
@@ -1384,7 +1396,7 @@ Respond ONLY with valid JSON, no other text:
                 const iconSrc = `/icons/wins/${type}_${iconState}.png`
 
                 return (
-                  <div key={type} className={`win-row ${effective === true ? 'achieved' : effective === false ? 'missed' : 'pending'}`}>
+                  <div key={type} className={`win-row ${effective === true ? 'achieved' : effective === false ? 'missed' : 'pending'}${evalFlash[type] ? ` win-row-flash-${type}` : ''}`}>
                     <div className="win-row-top">
                       <div className="win-row-label-group">
                         <img
@@ -1453,7 +1465,7 @@ Respond ONLY with valid JSON, no other text:
                 onChange={e => setTomorrowInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addTask()}
               />
-              <button className="add-btn" onClick={addTask}>+</button>
+              <button className={`add-btn${addFlash ? ' add-btn-flash' : ''}`} onClick={addTask}>+</button>
             </div>
             <div className="task-list">
               {tomorrowTasks.length === 0 && <p className="empty-msg">Nothing queued</p>}
@@ -1490,7 +1502,7 @@ Respond ONLY with valid JSON, no other text:
                 onChange={e => setWeeklyInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addTask()}
               />
-              <button className="add-btn" onClick={addTask}>+</button>
+              <button className={`add-btn${addFlash ? ' add-btn-flash' : ''}`} onClick={addTask}>+</button>
             </div>
             <div className="task-list">
               {weeklyTasks.length === 0 && <p className="empty-msg">No weekly goals</p>}
