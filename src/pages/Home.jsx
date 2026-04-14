@@ -137,6 +137,7 @@ function Home() {
   const [editPhysical, setEditPhysical] = useState('')
   const [editMental, setEditMental] = useState('')
   const [editSpiritual, setEditSpiritual] = useState('')
+  const [evalMode, setEvalMode] = useState('broad') // 'broad' | 'narrow'
   const [defsSaved, setDefsSaved] = useState(false)
   const [defsLoading, setDefsLoading] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -208,6 +209,7 @@ function Home() {
         setEditPhysical(data.winsDefinition?.physical || '')
         setEditMental(data.winsDefinition?.mental || '')
         setEditSpiritual(data.winsDefinition?.spiritual || '')
+        setEvalMode(data.evalMode || 'broad')
         setVisTodo(data.visibility?.todo || 'friends')
         setVisStats(data.visibility?.stats || 'public')
         setEditBio(data.bio || '')
@@ -568,6 +570,10 @@ function Home() {
     const physDef = defs.physical || 'any meaningful movement — climbing, gym, run, MMA, workout, sports'
     const mentDef = defs.mental || 'academic, professional, or goal-directed work — studying, researching, building, solving'
     const spirDef = defs.spiritual || 'broad and personal — journaling, meditation, prayer, sleeping 9+ hours, meaningful conversation, reflection'
+    const mode = userProfile?.evalMode || evalMode || 'broad'
+    const modeInstruction = mode === 'narrow'
+      ? 'Be strict — only award a win if the completed tasks clearly and directly match the definition. When in doubt, do not award the win.'
+      : 'Be reasonable — if the completed tasks plausibly reflect the spirit of the definition, award the win. Give benefit of the doubt for close calls.'
 
     const prompt = `You are evaluating whether someone achieved their Three Wins today based on their completed tasks.
 
@@ -578,6 +584,8 @@ Definitions (personal to the user):
 - Physical win: ${physDef}
 - Mental win: ${mentDef}
 - Spiritual win: ${spirDef}
+
+Evaluation mode: ${modeInstruction}
 
 Note: routine hygiene tasks (shower, eat, etc.) should NOT count as wins and should map to null.
 Daily habits tapped today appear as completed tasks — treat them the same as any other completed task.
@@ -711,6 +719,7 @@ Respond ONLY with valid JSON, no other text:
     setDefsSaved(false)
     const updated = {
       ...userProfile,
+      evalMode,
       winsDefinition: {
         physical: editPhysical.trim() || userProfile?.winsDefinition?.physical || '',
         mental: editMental.trim() || userProfile?.winsDefinition?.mental || '',
@@ -1929,6 +1938,21 @@ Respond ONLY with valid JSON, no other text:
                 rows={2}
                 placeholder="e.g. Journal, meditate, sleep early"
               />
+
+              <p className="profile-def-label" style={{ marginTop: '1rem' }}>Evaluation strictness</p>
+              <p className="profile-section-sub" style={{ marginBottom: '0.5rem' }}>
+                {evalMode === 'broad' ? 'Broad — Claude gives benefit of the doubt on close calls.' : 'Narrow — Claude only awards wins that clearly match your definitions.'}
+              </p>
+              <div className="eval-mode-toggle">
+                <button
+                  className={`eval-mode-btn ${evalMode === 'broad' ? 'active' : ''}`}
+                  onClick={() => setEvalMode('broad')}
+                >Broad</button>
+                <button
+                  className={`eval-mode-btn ${evalMode === 'narrow' ? 'active' : ''}`}
+                  onClick={() => setEvalMode('narrow')}
+                >Narrow</button>
+              </div>
 
               <button
                 className="profile-save-btn"
