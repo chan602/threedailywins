@@ -1324,7 +1324,11 @@ Respond ONLY with valid JSON, no other text:
                   ) : (
                     <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
                       {t.text}
-                      {t.carried && <span className="tag carried-tag">carried</span>}
+                      {t.carried && (
+                        <span className={`tag carried-tag${(t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
+                          carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
+                        </span>
+                      )}
                       {t.fromDTask && <span className="tag daily-tag">daily</span>}
                     </span>
                   )}
@@ -1492,7 +1496,12 @@ Respond ONLY with valid JSON, no other text:
                       onBlur={() => saveTaskEdit('weekly', t.id)} autoFocus />
                   ) : (
                     <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
-                      {t.text}{t.carried && <span className="tag carried-tag">carried</span>}
+                      {t.text}
+                      {t.carried && (
+                        <span className={`tag carried-tag${(t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
+                          carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
+                        </span>
+                      )}
                     </span>
                   )}
                   <button className="delete-btn" onClick={() => deleteTask('weekly', t.id)}>×</button>
