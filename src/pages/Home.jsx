@@ -1275,7 +1275,7 @@ Respond ONLY with valid JSON, no other text:
             )}
           </div>
           <div className="stat-pill stat-pill-clickable" onClick={() => setRankPopupOpen(o => !o)} onMouseLeave={() => setRankPopupOpen(false)} style={{ position: 'relative' }}>
-            <span className="stat-val">{globalRank ? `#${globalRank}` : '—'}</span>
+            <span className={`stat-val${globalRank === 1 ? ' rank-gold' : globalRank === 2 ? ' rank-silver' : globalRank === 3 ? ' rank-bronze' : ''}`}>{globalRank ? `#${globalRank}` : '—'}</span>
             <span className="stat-label">rank</span>
             {rankPopupOpen && (
               <div className="streak-popup">
@@ -1735,10 +1735,11 @@ Respond ONLY with valid JSON, no other text:
                     .sort((a, b) => (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0))
                   return sorted.map((entry, i) => {
                     const isMe = entry.uid === uid
+                    const rank = i + 1
                     return (
-                      <div key={entry.uid} className={`lb-row ${isMe ? 'me' : ''}`}
+                      <div key={entry.uid} className={`lb-row ${isMe ? 'me' : ''} ${rank <= 3 ? `lb-row-${rank}` : ''}`}
                         onClick={() => entry.username && navigate(`/u/${entry.username}`)}>
-                        <span className={`lb-rank ${i < 3 ? 'top' : ''}`}>{i + 1}</span>
+                        <span className={`lb-rank ${rank <= 3 ? `lb-rank-${rank}` : ''}`}>{rank}</span>
                         <div className="lb-avatar">
                           {entry.photoURL
                             ? <img src={entry.photoURL} alt="" className="profile-avatar-img" />
@@ -1795,10 +1796,10 @@ Respond ONLY with valid JSON, no other text:
                         return (
                           <div
                             key={entry.uid}
-                            className={`lb-row ${isMe ? 'me' : ''}`}
+                            className={`lb-row ${isMe ? 'me' : ''} ${rank <= 3 ? `lb-row-${rank}` : ''}`}
                             onClick={() => entry.username && navigate(`/u/${entry.username}`)}
                           >
-                            <span className={`lb-rank ${rank <= 3 ? 'top' : ''}`}>
+                            <span className={`lb-rank ${rank <= 3 ? `lb-rank-${rank}` : ''}`}>
                               {rank === 1 ? '1' : rank === 2 ? '2' : rank === 3 ? '3' : rank}
                             </span>
                             <div className="lb-avatar">
