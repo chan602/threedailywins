@@ -3,6 +3,18 @@ import { auth, db } from '../firebase'
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore'
 import { useNavigate } from 'react-router-dom'
 
+const BLACKLIST = [
+  'admin','administrator','moderator','mod','support','help','staff','system',
+  'fuck','shit','ass','bitch','cunt','dick','cock','pussy','nigger','nigga',
+  'faggot','fag','retard','chink','spic','kike','whore','slut',
+  'threedailywins','three_daily_wins','3wins','3dailywins',
+]
+
+function containsBlacklisted(username) {
+  const lower = username.toLowerCase()
+  return BLACKLIST.some(word => lower.includes(word))
+}
+
 function Onboarding() {
   const [step, setStep] = useState(1)
   const [username, setUsername] = useState('')
@@ -16,7 +28,19 @@ function Onboarding() {
   const handleUsernameSubmit = async () => {
     const trimmed = username.trim().toLowerCase()
     if (!trimmed || trimmed.length < 3) {
-      setError('Username must be at least 3 characters')
+      setError('Username must be at least 3 characters.')
+      return
+    }
+    if (trimmed.length > 20) {
+      setError('Username must be 20 characters or fewer.')
+      return
+    }
+    if (!/^[a-z0-9_]+$/.test(trimmed)) {
+      setError('Only letters, numbers, and underscores allowed.')
+      return
+    }
+    if (containsBlacklisted(trimmed)) {
+      setError('That username isn\'t allowed — please choose another.')
       return
     }
 
