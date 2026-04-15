@@ -282,7 +282,7 @@ body {
 
 .tutorial-tooltip {
   position: absolute;
-  background: var(--bg-card);
+  background: var(--bg-header);
   border: 0.5px solid var(--border-light);
   border-radius: 16px;
   padding: 1.25rem 1.25rem 1rem;
