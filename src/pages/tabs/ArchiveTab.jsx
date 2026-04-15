@@ -107,6 +107,16 @@ export default function ArchiveTab({
 
   return (
     <div>
+      {/* Legend */}
+      {!archiveLoading && (archiveDays.length > 0 || archiveWeeks.length > 0) && (
+        <div className="archive-legend">
+          <span className="archive-legend-item"><span className="archive-legend-dot physical" />Physical</span>
+          <span className="archive-legend-item"><span className="archive-legend-dot mental" />Mental</span>
+          <span className="archive-legend-item"><span className="archive-legend-dot spiritual" />Spiritual</span>
+          <span className="archive-legend-item"><span className="archive-legend-dot general" />General</span>
+        </div>
+      )}
+
       {archiveLoading && <p className="empty-msg">Loading archive…</p>}
 
       {!archiveLoading && archiveDays.length === 0 && archiveWeeks.length === 0 && (
@@ -126,14 +136,9 @@ export default function ArchiveTab({
             <div className="archive-week-header" onClick={() => toggleWeek(wk)}>
               <div className="archive-week-left">
                 <span className="archive-week-title">{weekLabelFromKey(wk, weekData?.weekStart)}</span>
-                {isThreeWinDay(weekWins) && <img src="/icons/wins/3w_logo.png" alt="Three Wins Week" className="three-wins-logo" />}
+                {isThreeWinDay(weekWins) && <span className="archive-3w-badge">3W</span>}
               </div>
               <div className="archive-week-right">
-                <div className="archive-win-badges">
-                  {['physical', 'mental', 'spiritual'].map(type => (
-                    <WinBadge key={type} type={type} value={getEffectiveWin(weekWins, type)} size="sm" />
-                  ))}
-                </div>
                 <span className={`archive-chevron ${weekOpen ? 'open' : ''}`}>▼</span>
               </div>
             </div>
@@ -195,18 +200,18 @@ export default function ArchiveTab({
                     <div className="archive-day-left">
                       <span className={`archive-day-date ${threeWin ? 'three-win' : ''}`}>{dateLabel}</span>
                       <span className="archive-day-meta">{done2}/{dayTasks.length} · {pct2}%</span>
-                      {threeWin && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
+                      {threeWin && <span className="archive-3w-badge">3W</span>}
                     </div>
                     <div className="archive-day-right">
                       {(() => {
                         const total = dayTasks.length
                         const taskMap = dayWins?.taskMap || {}
-                        const counts = { physical: 0, mental: 0, spiritual: 0, other: 0 }
+                        const counts = { physical: 0, mental: 0, spiritual: 0, general: 0 }
                         dayTasks.forEach(t => {
                           if (!t.done) return
                           const cat = taskMap[t.text]
                           if (cat === 'physical' || cat === 'mental' || cat === 'spiritual') counts[cat]++
-                          else counts.other++
+                          else counts.general++
                         })
                         const toW = n => total > 0 ? `${Math.round((n / total) * 100)}%` : '0%'
                         return (
@@ -214,7 +219,7 @@ export default function ArchiveTab({
                             <div className="archive-win-bar-seg physical"  style={{ width: toW(counts.physical) }} />
                             <div className="archive-win-bar-seg mental"    style={{ width: toW(counts.mental) }} />
                             <div className="archive-win-bar-seg spiritual" style={{ width: toW(counts.spiritual) }} />
-                            <div className="archive-win-bar-seg other"     style={{ width: toW(counts.other) }} />
+                            <div className="archive-win-bar-seg general"   style={{ width: toW(counts.general) }} />
                           </div>
                         )
                       })()}
