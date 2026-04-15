@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import ArchiveTab from './tabs/ArchiveTab'
+import LeaderboardTab from './tabs/LeaderboardTab'
+import FriendsTab from './tabs/FriendsTab'
 import { auth, db } from '../firebase'
 import { signOut, deleteUser } from 'firebase/auth'
 import {
@@ -52,22 +55,6 @@ function getWeekKeyForDate(dateStr) {
   return `${mon.getFullYear()}-W${String(wk).padStart(2, '0')}`
 }
 
-function weekLabelFromKey(wk, weekStart) {
-  // Prefer stored weekStart (ISO date string of the Monday)
-  if (weekStart) {
-    return `Week of ${new Date(weekStart + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-  }
-  // Fallback: derive Monday from YYYY-WNN using ISO week logic
-  const [yr, wNum] = wk.split('-W').map(Number)
-  // Jan 4 is always in week 1 per ISO 8601
-  const jan4 = new Date(yr, 0, 4)
-  const jan4Day = jan4.getDay() || 7 // convert Sunday(0) to 7
-  const weekOneMon = new Date(jan4)
-  weekOneMon.setDate(jan4.getDate() - (jan4Day - 1))
-  const mon = new Date(weekOneMon)
-  mon.setDate(weekOneMon.getDate() + (wNum - 1) * 7)
-  return `Week of ${mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-}
 
 function isThreeWinDay(w) {
   if (!w) return false
@@ -1163,6 +1150,13 @@ Respond ONLY with valid JSON, no other text:
     setShowPwaNotif(false)
   }
 
+  function getEffectiveWin(winsData, type) {
+    if (!winsData) return null
+    const overrideKey = `override${type.charAt(0).toUpperCase() + type.slice(1)}`
+    const override = winsData[overrideKey]
+    return override != null ? override : winsData[type]
+  }
+
   // ── ARCHIVE HELPERS ───────────────────────────────────
   function toggleDay(date) {
     setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }))
@@ -1173,41 +1167,6 @@ Respond ONLY with valid JSON, no other text:
   }
 
   // Group archive days by week
-  function groupDaysByWeek() {
-    const byWeek = {}
-    archiveDays.forEach(day => {
-      const wk = getWeekKeyForDate(day.date)
-      if (!byWeek[wk]) byWeek[wk] = []
-      byWeek[wk].push(day)
-    })
-    // sort days within each week descending
-    Object.values(byWeek).forEach(arr => arr.sort((a, b) => b.date.localeCompare(a.date)))
-    return byWeek
-  }
-
-  // ── WIN BADGE COMPONENT ───────────────────────────────
-  function WinBadge({ type, value, size = 'sm' }) {
-    const achieved = value === true
-    const iconSrc = `/icons/wins/${type}_${achieved ? 'achieved' : 'missed'}.png`
-    const iconSize = size === 'xs' ? 28 : 32
-    return (
-      <img
-        src={iconSrc}
-        alt={type}
-        className="win-badge-icon"
-        style={{ width: iconSize, height: iconSize, borderRadius: 6, objectFit: 'cover' }}
-        title={`${type}: ${achieved ? 'Achieved' : value === false ? 'Not detected' : 'Pending'}`}
-      />
-    )
-  }
-
-  function getEffectiveWin(winsData, type) {
-    if (!winsData) return null
-    const overrideKey = `override${type.charAt(0).toUpperCase() + type.slice(1)}`
-    const override = winsData[overrideKey]
-    return override != null ? override : winsData[type]
-  }
-
   // ── RENDER ────────────────────────────────────────────
   const doneTasks = todayTasks.filter(t => t.done).length
   const totalTasks = todayTasks.length
@@ -1216,13 +1175,6 @@ Respond ONLY with valid JSON, no other text:
   const evalTime = todayWins?.evaluatedAt
     ? new Date(todayWins.evaluatedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     : null
-
-  const daysByWeek = groupDaysByWeek()
-  const allWeekKeys = new Set([
-    ...archiveWeeks.map(w => w.weekKey),
-    ...Object.keys(daysByWeek)
-  ])
-  const sortedWeekKeys = [...allWeekKeys].sort().reverse()
 
   // ── RANK CALCULATIONS ────────────────────────────────
   const sortedByStreak = [...lbEntries].sort((a, b) =>
@@ -1680,323 +1632,40 @@ Respond ONLY with valid JSON, no other text:
 
         {/* ── FRIENDS ── */}
         {activeNav === 'friends' && (
-          <div className="friends-screen">
-            {isGuest ? (
-              <div className="guest-locked">
-                <p className="guest-locked-icon">👥</p>
-                <p className="guest-locked-title">Friends require an account</p>
-                <p className="guest-locked-body">Sign up to add friends, see their streaks, and compete on leaderboards.</p>
-                <button className="guest-locked-btn" onClick={() => navigate('/login')}>Create account</button>
-              </div>
-            ) : (<>
-
-            {/* Search */}
-            <div className="friends-header-row">
-              <div>
-                <p className="friends-title">Find people</p>
-                <p className="friends-sub">Search by username to add as a friend.</p>
-              </div>
-              <button
-                className="friends-share-btn"
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: 'threedailywins',
-                      text: 'Track your daily physical, mental, and spiritual wins.',
-                      url: 'https://threedailywins.com'
-                    }).catch(() => {})
-                  } else {
-                    navigator.clipboard.writeText('https://threedailywins.com')
-                    alert('Link copied to clipboard!')
-                  }
-                }}
-                title="Invite friends"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="friends-share-icon">
-                  <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/>
-                  <polyline points="16 6 12 2 8 6"/>
-                  <line x1="12" y1="2" x2="12" y2="15"/>
-                </svg>
-              </button>
-            </div>
-            <div className="friends-search-row">
-              <span className="friends-at">@</span>
-              <input
-                className="friends-input"
-                placeholder="username"
-                value={friendSearch}
-                onChange={e => { setFriendSearch(e.target.value); setFriendSearchError(''); setSearchedUser(null); setSendRequestStatus('') }}
-                onKeyDown={e => e.key === 'Enter' && searchUser()}
-              />
-              <button className="friends-search-btn" onClick={searchUser}>Search</button>
-            </div>
-            {friendSearchError && <p className="friends-error">{friendSearchError}</p>}
-
-            {/* Search result */}
-            {searchedUser && (
-              <div className="friends-result">
-                <div className="friends-result-identity">
-                  <div className="lb-avatar">
-                    {searchedUser.photoURL
-                      ? <img src={searchedUser.photoURL} alt="" className="profile-avatar-img" />
-                      : <span className="profile-avatar-initial">{searchedUser.username[0].toUpperCase()}</span>
-                    }
-                  </div>
-                  <span className="friends-result-name" onClick={() => navigate(`/u/${searchedUser.username}`)}>
-                    @{searchedUser.username}
-                  </span>
-                </div>
-                <div className="friends-result-actions">
-                  {searchedUser.uid === uid ? (
-                    <span className="friends-status-msg">That's you</span>
-                  ) : friendsList.some(f => f.uid === searchedUser.uid) ? (
-                    <span className="friends-status-msg friends-status-green">Already friends</span>
-                  ) : sendRequestStatus === 'sent' ? (
-                    <span className="friends-status-msg friends-status-green">Request sent!</span>
-                  ) : sendRequestStatus === 'already_sent' ? (
-                    <span className="friends-status-msg">Request already sent</span>
-                  ) : (
-                    <button
-                      className="friends-add-btn"
-                      onClick={sendFriendRequest}
-                      disabled={sendRequestStatus === 'sending'}
-                    >
-                      {sendRequestStatus === 'sending' ? 'Sending…' : '+ Add friend'}
-                    </button>
-                  )}
-                  <button className="friends-view-btn" onClick={() => navigate(`/u/${searchedUser.username}`)}>
-                    View profile
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="friends-divider" />
-
-            {/* Incoming requests */}
-            {incomingRequests.length > 0 && (
-              <div className="friends-section">
-                <p className="friends-section-title">
-                  Friend requests
-                  <span className="friends-badge">{incomingRequests.length}</span>
-                </p>
-                {incomingRequests.map(req => (
-                  <div key={req.id} className="friends-request-row">
-                    <div className="lb-avatar">
-                      {req.photoURL
-                        ? <img src={req.photoURL} alt="" className="profile-avatar-img" />
-                        : <span className="profile-avatar-initial">{(req.username || '?')[0].toUpperCase()}</span>
-                      }
-                    </div>
-                    <span
-                      className="friends-req-name"
-                      onClick={() => navigate(`/u/${req.username}`)}
-                    >@{req.username}</span>
-                    <div className="friends-req-actions">
-                      <button className="friends-accept-btn" onClick={() => acceptRequest(req.uid, req.username, req.photoURL)}>Accept</button>
-                      <button className="friends-decline-btn" onClick={() => declineRequest(req.uid)}>Decline</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Friends list */}
-            <div className="friends-section">
-              <p className="friends-section-title">Friends ({friendsList.length})</p>
-              {friendsList.length === 0 ? (
-                <p className="friends-empty">No friends yet — search for someone to add.</p>
-              ) : (
-                friendsList.map(f => (
-                  <div key={f.id} className="friends-list-row">
-                    <div className="lb-avatar">
-                      {f.photoURL
-                        ? <img src={f.photoURL} alt="" className="profile-avatar-img" />
-                        : <span className="profile-avatar-initial">{(f.username || '?')[0].toUpperCase()}</span>
-                      }
-                    </div>
-                    <span
-                      className="friends-list-name"
-                      onClick={() => navigate(`/u/${f.username}`)}
-                    >@{f.username}</span>
-                    <button className="friends-remove-btn" onClick={() => removeFriend(f.uid)}>Remove</button>
-                  </div>
-                ))
-              )}
-            </div>
-
-          </>) }
-        </div>
+          <FriendsTab
+            isGuest={isGuest}
+            navigate={navigate}
+            uid={uid}
+            friendSearch={friendSearch}
+            setFriendSearch={setFriendSearch}
+            friendSearchError={friendSearchError}
+            setFriendSearchError={setFriendSearchError}
+            searchedUser={searchedUser}
+            setSearchedUser={setSearchedUser}
+            sendRequestStatus={sendRequestStatus}
+            setSendRequestStatus={setSendRequestStatus}
+            friendsList={friendsList}
+            incomingRequests={incomingRequests}
+            searchUser={searchUser}
+            sendFriendRequest={sendFriendRequest}
+            acceptRequest={acceptRequest}
+            declineRequest={declineRequest}
+            removeFriend={removeFriend}
+          />
         )}
 
-        {/* ── LEADERBOARD PLACEHOLDER ── */}
+        {/* ── LEADERBOARD ── */}
         {activeNav === 'leaderboard' && (
-          <div className="lb-screen">
-            {isGuest ? (
-              <div className="guest-locked">
-                <p className="guest-locked-icon">🏆</p>
-                <p className="guest-locked-title">Leaderboard requires an account</p>
-                <p className="guest-locked-body">Sign up to track your streak, rank globally, and compete with friends.</p>
-                <button className="guest-locked-btn" onClick={() => navigate('/login')}>Create account</button>
-              </div>
-            ) : (<>
-
-            {/* Sub-tabs */}
-            <div className="lb-tabs">
-              <button
-                className={`lb-tab ${lbTab === 'streak' ? 'active' : ''}`}
-                onClick={() => setLbTab('streak')}
-              >Streak</button>
-              <button
-                className={`lb-tab ${lbTab === 'wins' ? 'active' : ''}`}
-                onClick={() => setLbTab('wins')}
-              >Total Wins</button>
-              <button
-                className={`lb-tab ${lbTab === 'friends' ? 'active' : ''}`}
-                onClick={() => setLbTab('friends')}
-              >Friends</button>
-            </div>
-
-            {/* Friends leaderboard */}
-            {lbTab === 'friends' && (
-              <div className="lb-list" style={{ padding: '0 1rem' }}>
-                {friendsList.length === 0 ? (
-                  <p className="empty-msg" style={{ paddingTop: '1.5rem' }}>Add friends to see a friend leaderboard.</p>
-                ) : (() => {
-                  // Filter leaderboard entries to friends + self
-                  const friendUids = new Set([...friendsList.map(f => f.uid), uid])
-                  const sorted = lbEntries
-                    .filter(e => friendUids.has(e.uid))
-                    .sort((a, b) => (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0))
-                  return sorted.map((entry, i) => {
-                    const isMe = entry.uid === uid
-                    const rank = i + 1
-                    return (
-                      <div key={entry.uid} className={`lb-row ${isMe ? 'me' : ''} ${rank <= 3 ? `lb-row-${rank}` : ''}`}
-                        onClick={() => entry.username && navigate(`/u/${entry.username}`)}>
-                        <span className={`lb-rank ${rank <= 3 ? `lb-rank-${rank}` : ''}`}>{rank}</span>
-                        <div className="lb-avatar">
-                          {entry.photoURL
-                            ? <img src={entry.photoURL} alt="" className="profile-avatar-img" />
-                            : <span className="profile-avatar-initial">{(entry.username || '?')[0].toUpperCase()}</span>
-                          }
-                        </div>
-                        <span className="lb-username">
-                          @{entry.username || '—'}
-                          {isMe && <span className="lb-you"> you</span>}
-                        </span>
-                        <div className="lb-stats">
-                          <span className="lb-stat-val">{entry.current ?? 0}</span>
-                          <span className="lb-stat-label">streak</span>
-                        </div>
-                        <div className="lb-stats">
-                          <span className="lb-stat-val">{entry.total ?? 0}</span>
-                          <span className="lb-stat-label">wins</span>
-                        </div>
-                      </div>
-                    )
-                  })
-                })()}
-              </div>
-            )}
-
-            {/* Global leaderboard */}
-            {(lbTab === 'streak' || lbTab === 'wins') && (
-              <>
-                {lbLoading && <p className="empty-msg">Loading…</p>}
-                {!lbLoading && (() => {
-                  const sorted = [...lbEntries].sort((a, b) => {
-                    if (lbTab === 'streak') {
-                      return (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0)
-                    } else {
-                      return (b.total ?? 0) - (a.total ?? 0) || (b.current ?? 0) - (a.current ?? 0)
-                    }
-                  })
-
-                  // Find own rank
-                  const ownRank = sorted.findIndex(e => e.uid === uid) + 1
-                  // Show top 50, always include self if outside top 50
-                  const top = sorted.slice(0, 50)
-                  const selfEntry = sorted.find(e => e.uid === uid)
-                  const selfInTop = top.some(e => e.uid === uid)
-
-                  return (
-                    <div className="lb-list">
-                      {top.length === 0 && (
-                        <p className="empty-msg">No entries yet — evaluate your wins to appear here.</p>
-                      )}
-                      {top.map((entry, i) => {
-                        const isMe = entry.uid === uid
-                        const rank = i + 1
-                        return (
-                          <div
-                            key={entry.uid}
-                            className={`lb-row ${isMe ? 'me' : ''} ${rank <= 3 ? `lb-row-${rank}` : ''}`}
-                            onClick={() => entry.username && navigate(`/u/${entry.username}`)}
-                          >
-                            <span className={`lb-rank ${rank <= 3 ? `lb-rank-${rank}` : ''}`}>
-                              {rank === 1 ? '1' : rank === 2 ? '2' : rank === 3 ? '3' : rank}
-                            </span>
-                            <div className="lb-avatar">
-                              {entry.photoURL
-                                ? <img src={entry.photoURL} alt="" className="profile-avatar-img" />
-                                : <span className="profile-avatar-initial">
-                                    {(entry.username || '?')[0].toUpperCase()}
-                                  </span>
-                              }
-                            </div>
-                            <span className="lb-username">
-                              @{entry.username || '—'}
-                              {isMe && <span className="lb-you"> you</span>}
-                            </span>
-                            <div className="lb-stats">
-                              <span className="lb-stat-val">{entry.current ?? 0}</span>
-                              <span className="lb-stat-label">streak</span>
-                            </div>
-                            <div className="lb-stats">
-                              <span className="lb-stat-val">{entry.total ?? 0}</span>
-                              <span className="lb-stat-label">wins</span>
-                            </div>
-                          </div>
-                        )
-                      })}
-
-                      {/* Show own row outside top 50 */}
-                      {!selfInTop && selfEntry && (
-                        <>
-                          <div className="lb-gap">···</div>
-                          <div className="lb-row me">
-                            <span className="lb-rank">{ownRank}</span>
-                            <div className="lb-avatar">
-                              {selfEntry.photoURL
-                                ? <img src={selfEntry.photoURL} alt="" className="profile-avatar-img" />
-                                : <span className="profile-avatar-initial">
-                                    {(selfEntry.username || '?')[0].toUpperCase()}
-                                  </span>
-                              }
-                            </div>
-                            <span className="lb-username">
-                              @{selfEntry.username || '—'}
-                              <span className="lb-you"> you</span>
-                            </span>
-                            <div className="lb-stats">
-                              <span className="lb-stat-val">{selfEntry.current ?? 0}</span>
-                              <span className="lb-stat-label">streak</span>
-                            </div>
-                            <div className="lb-stats">
-                              <span className="lb-stat-val">{selfEntry.total ?? 0}</span>
-                              <span className="lb-stat-label">wins</span>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )
-                })()}
-              </>
-            )}
-          </>) }
-          </div>
+          <LeaderboardTab
+            isGuest={isGuest}
+            navigate={navigate}
+            uid={uid}
+            lbTab={lbTab}
+            setLbTab={setLbTab}
+            lbEntries={lbEntries}
+            lbLoading={lbLoading}
+            friendsList={friendsList}
+          />
         )}
 
         {/* ── PROFILE / SETTINGS ── */}
@@ -2251,183 +1920,27 @@ Respond ONLY with valid JSON, no other text:
 
         {/* ── ARCHIVE ── */}
         {activeNav === 'archive' && (
-          <div>
-            {isGuest && (
-              <div className="guest-locked">
-                <p className="guest-locked-icon">🗄️</p>
-                <p className="guest-locked-title">Archive is unavailable in guest mode</p>
-                <p className="guest-locked-body">Create an account to automatically archive your days and track your history.</p>
-                <button className="guest-locked-btn" onClick={() => navigate('/login')}>Create account</button>
-              </div>
-            )}
-            {!isGuest && archiveLoading && <p className="empty-msg">Loading archive…</p>}
-
-            {!archiveLoading && archiveDays.length === 0 && archiveWeeks.length === 0 && (
-              <p className="empty-msg">No archive yet — days archive automatically at midnight.</p>
-            )}
-
-            {!archiveLoading && sortedWeekKeys.map(wk => {
-              const weekData = archiveWeeks.find(w => w.weekKey === wk) || null
-              const days = daysByWeek[wk] || []
-              const weekWins = winsCache['week-' + wk] || null
-              const weekOpen = expandedWeeks[wk] === true // default collapsed
-
-              return (
-                <div key={wk} className="archive-week-group">
-
-                  {/* Week header */}
-                  <div className="archive-week-header" onClick={() => toggleWeek(wk)}>
-                    <div className="archive-week-left">
-                      <span className="archive-week-title">{weekLabelFromKey(wk, weekData?.weekStart)}</span>
-                      {isThreeWinDay(weekWins) && <img src="/icons/wins/3w_logo.png" alt="Three Wins Week" className="three-wins-logo" />}
-                    </div>
-                    <div className="archive-week-right">
-                      <div className="archive-win-badges">
-                        {['physical', 'mental', 'spiritual'].map(type => (
-                          <WinBadge key={type} type={type} value={getEffectiveWin(weekWins, type)} size="sm" />
-                        ))}
-                      </div>
-                      <span className={`archive-chevron ${weekOpen ? 'open' : ''}`}>▼</span>
-                    </div>
-                  </div>
-
-                  {/* Weekly tasks summary — only shown when week is expanded */}
-                  {weekOpen && weekData && (weekData.wTasks?.length > 0 || weekData.dTasks?.length > 0) && (
-                    <div className="archive-week-body">
-                      <div className="archive-week-summary">
-                        {weekData.dTasks?.length > 0 && (
-                          <div className="archive-week-section">
-                            <p className="archive-week-section-label">Daily Habits</p>
-                            {weekData.dTasks.map((t, i) => {
-                              const pct2 = Math.round(((t.count || 0) / 7) * 100)
-                              return (
-                                <div key={i} className="archive-d-row">
-                                  <span className="archive-d-label">D{i + 1} — {t.text}</span>
-                                  <div className="archive-d-bar">
-                                    <div className="archive-d-bar-fill" style={{ width: `${pct2}%` }} />
-                                  </div>
-                                  <span className="archive-d-count">{t.count || 0}/7</span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
-                        {weekData.wTasks?.length > 0 && (
-                          <div className="archive-week-section">
-                            <p className="archive-week-section-label">Weekly Goals</p>
-                            {weekData.wTasks.map((t, i) => (
-                              <div key={i} className={`archive-w-row ${t.done ? 'done' : ''}`}>
-                                <span className={`archive-w-dot ${t.done ? 'done' : ''}`} />
-                                <span className="archive-w-text">W{i + 1} — {t.text}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {weekWins?.reasoning && (
-                          <p className="archive-reasoning">{weekWins.reasoning}</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Day rows — always visible */}
-                  {days.map(day => {
-                    const dayTasks = day.tasks || []
-                    const done2 = dayTasks.filter(t => t.done).length
-                    const pct2 = dayTasks.length > 0 ? Math.round(done2 / dayTasks.length * 100) : 0
-                    const dayWins = winsCache[day.date] || null
-                    const threeWin = isThreeWinDay(dayWins)
-                    const dayOpen = expandedDays[day.date]
-                    const dateLabel = new Date(day.date + 'T12:00:00').toLocaleDateString('en-US', {
-                      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
-                    })
-
-                    return (
-                      <div key={day.date} className={`archive-day ${threeWin ? 'three-win' : ''}`}>
-                        <div className="archive-day-header" onClick={() => toggleDay(day.date)}>
-                          <div className="archive-day-left">
-                            <span className={`archive-day-date ${threeWin ? 'three-win' : ''}`}>{dateLabel}</span>
-                            <span className="archive-day-meta">{done2}/{dayTasks.length} · {pct2}%</span>
-                            {threeWin && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
-                          </div>
-                          <div className="archive-day-right">
-                            <div className="archive-win-badges">
-                              {['physical', 'mental', 'spiritual'].map(type => (
-                                <WinBadge key={type} type={type} value={getEffectiveWin(dayWins, type)} size="xs" />
-                              ))}
-                            </div>
-                            <span className={`archive-chevron ${dayOpen ? 'open' : ''}`}>▼</span>
-                          </div>
-                        </div>
-
-                        {dayOpen && (
-                          <div className="archive-day-body">
-                            {dayTasks.map((t, i) => {
-                              const winCat = dayWins?.taskMap?.[t.text]
-                              const winDot = winCat ? `win-dot-${winCat}` : ''
-                              return (
-                                <div key={i} className={`archive-task ${t.done ? 'done' : ''}`}>
-                                  <button
-                                    className={`archive-check-btn ${t.done ? 'done' : ''}`}
-                                    onClick={() => updateArchiveTask(day.date, t.id, { done: !t.done })}
-                                  />
-                                  {winCat && <span className={`archive-win-dot ${winDot}`} />}
-                                  <span className="archive-task-text">{t.text}</span>
-                                  <button className="delete-btn" onClick={() => deleteArchiveTask(day.date, t.id)}>×</button>
-                                </div>
-                              )
-                            })}
-
-                            {editingArchiveDay === day.date ? (
-                              <div className="archive-add-row">
-                                <input
-                                  className="task-input"
-                                  placeholder="Add task..."
-                                  value={archiveAddInput}
-                                  onChange={e => setArchiveAddInput(e.target.value)}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') addArchiveTask(day.date)
-                                    if (e.key === 'Escape') setEditingArchiveDay(null)
-                                  }}
-                                  autoFocus
-                                />
-                                <button className="add-btn" onClick={() => addArchiveTask(day.date)}>+</button>
-                                <button className="archive-cancel-btn" onClick={() => setEditingArchiveDay(null)}>✕</button>
-                              </div>
-                            ) : (
-                              <button className="archive-add-task-btn" onClick={() => { setEditingArchiveDay(day.date); setArchiveAddInput('') }}>
-                                + Add task
-                              </button>
-                            )}
-
-                            {dayWins?.reasoning && (
-                              <p className="archive-reasoning">{dayWins.reasoning}</p>
-                            )}
-
-                            {/* Evaluate / Re-evaluate button */}
-                            <div className="archive-eval-row">
-                              <button
-                                className="archive-eval-btn"
-                                onClick={() => evaluateArchiveDay(day.date, dayTasks)}
-                                disabled={archiveEvalLoading === day.date || dayTasks.filter(t => t.done).length === 0}
-                              >
-                                {archiveEvalLoading === day.date
-                                  ? 'Evaluating…'
-                                  : dayWins?.evaluatedAt ? 'Re-evaluate' : 'Evaluate'}
-                              </button>
-                              {!dayWins && dayTasks.filter(t => t.done).length === 0 && (
-                                <p className="archive-not-evaluated">Complete tasks to evaluate.</p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
+          <ArchiveTab
+            isGuest={isGuest}
+            navigate={navigate}
+            archiveLoading={archiveLoading}
+            archiveDays={archiveDays}
+            archiveWeeks={archiveWeeks}
+            winsCache={winsCache}
+            expandedDays={expandedDays}
+            expandedWeeks={expandedWeeks}
+            editingArchiveDay={editingArchiveDay}
+            archiveAddInput={archiveAddInput}
+            archiveEvalLoading={archiveEvalLoading}
+            setArchiveAddInput={setArchiveAddInput}
+            setEditingArchiveDay={setEditingArchiveDay}
+            toggleDay={toggleDay}
+            toggleWeek={toggleWeek}
+            updateArchiveTask={updateArchiveTask}
+            deleteArchiveTask={deleteArchiveTask}
+            addArchiveTask={addArchiveTask}
+            evaluateArchiveDay={evaluateArchiveDay}
+          />
         )}
 
       </div>
