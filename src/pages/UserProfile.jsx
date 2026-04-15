@@ -4,25 +4,7 @@ import { auth, db } from '../firebase'
 import {
   collection, doc, getDoc, getDocs, query, where
 } from 'firebase/firestore'
-
-function todayStr() {
-  return new Date().toLocaleDateString('en-CA')
-}
-
-function isThreeWinDay(w) {
-  if (!w) return false
-  const p = w.overridePhysical != null ? w.overridePhysical : w.physical
-  const m = w.overrideMental != null ? w.overrideMental : w.mental
-  const s = w.overrideSpiritual != null ? w.overrideSpiritual : w.spiritual
-  return p && m && s
-}
-
-function getEffectiveWin(winsData, type) {
-  if (!winsData) return null
-  const overrideKey = `override${type.charAt(0).toUpperCase() + type.slice(1)}`
-  const override = winsData[overrideKey]
-  return override != null ? override : winsData[type]
-}
+import { todayStr, isThreeWinDay, getEffectiveWin, getWeekKeyForDate, weekLabelFromKey } from './tabs/utils'
 
 function WinBadge({ type, value, size = 'sm' }) {
   const achieved = value === true
@@ -37,31 +19,6 @@ function WinBadge({ type, value, size = 'sm' }) {
       title={`${type}: ${achieved ? 'Achieved' : value === false ? 'Not detected' : 'Pending'}`}
     />
   )
-}
-
-// ── ARCHIVE HELPERS ──────────────────────────────────
-function getWeekKeyForDate(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00')
-  const day = d.getDay()
-  const diffToMon = day === 0 ? -6 : 1 - day
-  const mon = new Date(d); mon.setDate(d.getDate() + diffToMon)
-  const jan1 = new Date(mon.getFullYear(), 0, 1)
-  const wk = Math.ceil(((mon - jan1) / 86400000 + jan1.getDay() + 1) / 7)
-  return `${mon.getFullYear()}-W${String(wk).padStart(2, '0')}`
-}
-
-function weekLabelFromKey(wk, weekStart) {
-  if (weekStart) {
-    return `Week of ${new Date(weekStart + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-  }
-  const [yr, wNum] = wk.split('-W').map(Number)
-  const jan4 = new Date(yr, 0, 4)
-  const jan4Day = jan4.getDay() || 7
-  const weekOneMon = new Date(jan4)
-  weekOneMon.setDate(jan4.getDate() - (jan4Day - 1))
-  const mon = new Date(weekOneMon)
-  mon.setDate(weekOneMon.getDate() + (wNum - 1) * 7)
-  return `Week of ${mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
 }
 
 function UserProfile() {

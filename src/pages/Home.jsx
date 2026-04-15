@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { todayStr, tomorrowStr, weekKey, getWeekKeyForDate, isThreeWinDay, getEffectiveWin } from './tabs/utils'
 import ArchiveTab from './tabs/ArchiveTab'
 import LeaderboardTab from './tabs/LeaderboardTab'
 import FriendsTab from './tabs/FriendsTab'
@@ -18,44 +19,6 @@ const WORKER_URL = 'https://anthropic-proxy.emailtonathan.workers.dev/'
 const WORKER_SECRET = '3w-app-2026-xk9m'  // ← same string as the worker
 
 // ── HELPERS ──────────────────────────────────────────────
-function todayStr() {
-  return new Date().toLocaleDateString('en-CA')
-}
-
-function tomorrowStr() {
-  const d = new Date(); d.setDate(d.getDate() + 1)
-  return d.toLocaleDateString('en-CA')
-}
-
-function weekKey() {
-  const d = new Date()
-  const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  const mon = new Date(d); mon.setDate(d.getDate() + diff)
-  const jan1 = new Date(mon.getFullYear(), 0, 1)
-  const week = Math.ceil(((mon - jan1) / 86400000 + jan1.getDay() + 1) / 7)
-  return `${mon.getFullYear()}-W${String(week).padStart(2, '0')}`
-}
-
-function getWeekKeyForDate(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00')
-  const day = d.getDay()
-  const diffToMon = day === 0 ? -6 : 1 - day
-  const mon = new Date(d); mon.setDate(d.getDate() + diffToMon)
-  const jan1 = new Date(mon.getFullYear(), 0, 1)
-  const wk = Math.ceil(((mon - jan1) / 86400000 + jan1.getDay() + 1) / 7)
-  return `${mon.getFullYear()}-W${String(wk).padStart(2, '0')}`
-}
-
-
-function isThreeWinDay(w) {
-  if (!w) return false
-  const p = w.overridePhysical != null ? w.overridePhysical : w.physical
-  const m = w.overrideMental != null ? w.overrideMental : w.mental
-  const s = w.overrideSpiritual != null ? w.overrideSpiritual : w.spiritual
-  return p && m && s
-}
-
 // ── MAIN COMPONENT ───────────────────────────────────────
 function Home({ isGuest = false }) {
   const user = isGuest ? null : auth.currentUser
@@ -1140,13 +1103,6 @@ Respond ONLY with valid JSON, no other text:
   function dismissPwaNotif() {
     localStorage.setItem('pwa_notif_dismissed', '1')
     setShowPwaNotif(false)
-  }
-
-  function getEffectiveWin(winsData, type) {
-    if (!winsData) return null
-    const overrideKey = `override${type.charAt(0).toUpperCase() + type.slice(1)}`
-    const override = winsData[overrideKey]
-    return override != null ? override : winsData[type]
   }
 
   // ── ARCHIVE HELPERS ───────────────────────────────────
