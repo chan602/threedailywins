@@ -288,6 +288,12 @@ function UserProfile() {
 
           return (
             <div className="upro-archive-body">
+              <div className="archive-legend">
+                <span className="archive-legend-item"><span className="archive-legend-dot physical" />Physical</span>
+                <span className="archive-legend-item"><span className="archive-legend-dot mental" />Mental</span>
+                <span className="archive-legend-item"><span className="archive-legend-dot spiritual" />Spiritual</span>
+                <span className="archive-legend-item"><span className="archive-legend-dot general" />General</span>
+              </div>
               {sortedWeeks.map(wk => {
                 const days = byWeek[wk]
                 const weekOpen = expandedWeeks[wk] !== false
