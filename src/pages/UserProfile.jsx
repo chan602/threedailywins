@@ -80,6 +80,7 @@ function UserProfile() {
   const [archiveOpen, setArchiveOpen] = useState(true)   // open by default
   const [expandedDays, setExpandedDays] = useState({})   // { [date]: bool }
   const [expandedWeeks, setExpandedWeeks] = useState({}) // { [weekKey]: bool }
+  const [globalRank, setGlobalRank] = useState(null)
 
   useEffect(() => {
     loadProfile()
@@ -121,6 +122,15 @@ function UserProfile() {
       if (canSee(visibility.stats)) {
         const streakSnap = await getDoc(doc(db, 'streak', uid, 'data', 'current'))
         if (streakSnap.exists()) setStreak(streakSnap.data())
+
+        // Compute global rank from leaderboard
+        const lbSnap = await getDocs(collection(db, 'leaderboard'))
+        const lbEntries = lbSnap.docs.map(d => d.data())
+        const sorted = [...lbEntries].sort((a, b) =>
+          (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0)
+        )
+        const rankIdx = sorted.findIndex(e => e.uid === uid)
+        setGlobalRank(rankIdx >= 0 ? rankIdx + 1 : null)
       }
 
       // 4. Load today's tasks if todo visibility allows
@@ -207,18 +217,18 @@ function UserProfile() {
 
       {/* Stats */}
       {streak ? (
-        <div className="profile-stats-row" style={{ marginBottom: '1.5rem' }}>
-          <div className="profile-stat">
-            <span className="profile-stat-val">{streak.current ?? 0}</span>
-            <span className="profile-stat-label">Current streak</span>
+        <div className="home-stats" style={{ marginBottom: '1.5rem' }}>
+          <div className={`stat-pill${(streak.current ?? 0) > 0 ? ' stat-pill-win' : ''}`}>
+            <span className="stat-val">{streak.current ?? 0}</span>
+            <span className="stat-label">streak</span>
           </div>
-          <div className="profile-stat">
-            <span className="profile-stat-val">{streak.best ?? 0}</span>
-            <span className="profile-stat-label">Best streak</span>
+          <div className="stat-pill">
+            <span className="stat-val">{globalRank ? `#${globalRank}` : '—'}</span>
+            <span className="stat-label">rank</span>
           </div>
-          <div className="profile-stat">
-            <span className="profile-stat-val">{streak.total ?? 0}</span>
-            <span className="profile-stat-label">Total wins</span>
+          <div className="stat-pill">
+            <span className="stat-val">{streak.total ?? 0}</span>
+            <span className="stat-label">total wins</span>
           </div>
         </div>
       ) : (
