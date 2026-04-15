@@ -198,11 +198,26 @@ export default function ArchiveTab({
                       {threeWin && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
                     </div>
                     <div className="archive-day-right">
-                      <div className="archive-win-badges">
-                        {['physical', 'mental', 'spiritual'].map(type => (
-                          <WinBadge key={type} type={type} value={getEffectiveWin(dayWins, type)} size="xs" />
-                        ))}
-                      </div>
+                      {(() => {
+                        const total = dayTasks.length
+                        const taskMap = dayWins?.taskMap || {}
+                        const counts = { physical: 0, mental: 0, spiritual: 0, other: 0 }
+                        dayTasks.forEach(t => {
+                          if (!t.done) return
+                          const cat = taskMap[t.text]
+                          if (cat === 'physical' || cat === 'mental' || cat === 'spiritual') counts[cat]++
+                          else counts.other++
+                        })
+                        const toW = n => total > 0 ? `${Math.round((n / total) * 100)}%` : '0%'
+                        return (
+                          <div className="archive-win-bar" title={`${done2}/${total} tasks`}>
+                            <div className="archive-win-bar-seg physical"  style={{ width: toW(counts.physical) }} />
+                            <div className="archive-win-bar-seg mental"    style={{ width: toW(counts.mental) }} />
+                            <div className="archive-win-bar-seg spiritual" style={{ width: toW(counts.spiritual) }} />
+                            <div className="archive-win-bar-seg other"     style={{ width: toW(counts.other) }} />
+                          </div>
+                        )
+                      })()}
                       <span className={`archive-chevron ${dayOpen ? 'open' : ''}`}>▼</span>
                     </div>
                   </div>
