@@ -4,22 +4,7 @@ import { auth, db } from '../firebase'
 import {
   collection, doc, getDoc, getDocs, query, where
 } from 'firebase/firestore'
-import { todayStr, isThreeWinDay, getEffectiveWin, getWeekKeyForDate, weekLabelFromKey } from './tabs/utils'
-
-function WinBadge({ type, value, size = 'sm' }) {
-  const achieved = value === true
-  const iconSrc = `/icons/wins/${type}_${achieved ? 'achieved' : 'missed'}.png`
-  const iconSize = size === 'xs' ? 28 : 32
-  return (
-    <img
-      src={iconSrc}
-      alt={type}
-      className="win-badge-icon"
-      style={{ width: iconSize, height: iconSize, borderRadius: 6, objectFit: 'cover' }}
-      title={`${type}: ${achieved ? 'Achieved' : value === false ? 'Not detected' : 'Pending'}`}
-    />
-  )
-}
+import { todayStr, isThreeWinDay, getWeekKeyForDate, weekLabelFromKey } from './tabs/utils'
 
 function UserProfile() {
   const { username } = useParams()
@@ -201,10 +186,27 @@ function UserProfile() {
           {todayTasks !== null && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="upro-task-meta">{doneTasks}/{totalTasks} · {pct}%</span>
-              {['physical', 'mental', 'spiritual'].map(type => (
-                <WinBadge key={type} type={type} value={getEffectiveWin(todayWins, type)} size="xs" />
-              ))}
-              {threeWinToday && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
+              {(() => {
+                const taskMap = todayWins?.taskMap || {}
+                const total = totalTasks
+                const counts = { physical: 0, mental: 0, spiritual: 0, general: 0 }
+                todayTasks.forEach(t => {
+                  if (!t.done) return
+                  const cat = taskMap[t.text]
+                  if (cat === 'physical' || cat === 'mental' || cat === 'spiritual') counts[cat]++
+                  else counts.general++
+                })
+                const toW = n => total > 0 ? `${Math.round((n / total) * 100)}%` : '0%'
+                return (
+                  <div className="archive-win-bar" title={`${doneTasks}/${totalTasks} tasks`}>
+                    <div className="archive-win-bar-seg physical"  style={{ width: toW(counts.physical) }} />
+                    <div className="archive-win-bar-seg mental"    style={{ width: toW(counts.mental) }} />
+                    <div className="archive-win-bar-seg spiritual" style={{ width: toW(counts.spiritual) }} />
+                    <div className="archive-win-bar-seg general"   style={{ width: toW(counts.general) }} />
+                  </div>
+                )
+              })()}
+              {threeWinToday && <span className="archive-3w-badge">3W</span>}
             </div>
           )}
         </div>
@@ -319,14 +321,29 @@ function UserProfile() {
                                 <div className="archive-day-left">
                                   <span className={`archive-day-date ${threeWin ? 'three-win' : ''}`}>{dateLabel}</span>
                                   <span className="archive-day-meta">{done}/{dayTasks.length} · {pct2}%</span>
-                                  {threeWin && <img src="/icons/wins/3w_logo.png" alt="Three Wins" className="three-wins-logo" />}
+                                  {threeWin && <span className="archive-3w-badge">3W</span>}
                                 </div>
                                 <div className="archive-day-right">
-                                  <div className="archive-win-badges">
-                                    {['physical', 'mental', 'spiritual'].map(type => (
-                                      <WinBadge key={type} type={type} value={getEffectiveWin(dayWins, type)} size="xs" />
-                                    ))}
-                                  </div>
+                                  {(() => {
+                                    const total = dayTasks.length
+                                    const taskMap = dayWins?.taskMap || {}
+                                    const counts = { physical: 0, mental: 0, spiritual: 0, general: 0 }
+                                    dayTasks.forEach(t => {
+                                      if (!t.done) return
+                                      const cat = taskMap[t.text]
+                                      if (cat === 'physical' || cat === 'mental' || cat === 'spiritual') counts[cat]++
+                                      else counts.general++
+                                    })
+                                    const toW = n => total > 0 ? `${Math.round((n / total) * 100)}%` : '0%'
+                                    return (
+                                      <div className="archive-win-bar" title={`${done}/${total} tasks`}>
+                                        <div className="archive-win-bar-seg physical"  style={{ width: toW(counts.physical) }} />
+                                        <div className="archive-win-bar-seg mental"    style={{ width: toW(counts.mental) }} />
+                                        <div className="archive-win-bar-seg spiritual" style={{ width: toW(counts.spiritual) }} />
+                                        <div className="archive-win-bar-seg general"   style={{ width: toW(counts.general) }} />
+                                      </div>
+                                    )
+                                  })()}
                                   <span className={`archive-chevron ${dayOpen ? 'open' : ''}`}>▼</span>
                                 </div>
                               </div>
