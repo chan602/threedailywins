@@ -203,3 +203,69 @@ exports.midnightRollover = onSchedule(
     console.log('Midnight rollover complete')
   }
 )
+
+// ── EVALUATE WIN — callable function ─────────────────────
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+
+exports.evaluateWin = onCall(
+  { memory: "256MiB", timeoutSeconds: 30 },
+  async (request) => {
+    // 1. Verify auth
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in to evaluate wins.");
+    }
+    const uid = request.auth.uid;
+    const { prompt, type, date } = request.data;
+
+    if (!prompt || !type || !date) {
+      throw new HttpsError("invalid-argument", "Missing prompt, type, or date.");
+    }
+
+    // 2. Rate limit — 3 evals/day for free users
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    const evalCountRef = db.doc(`meta/${uid}/evalCount/${today}`);
+    const evalSnap = await evalCountRef.get();
+    const evalData = evalSnap.exists ? evalSnap.data() : { count: 0 };
+
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const isPro = userSnap.exists ? (userSnap.data().isPro || false) : false;
+    const dailyLimit = isPro ? Infinity : 3;
+
+    if (evalData.count >= dailyLimit) {
+      throw new HttpsError("resource-exhausted", `Free tier limit is ${dailyLimit} evals per day.`);
+    }
+
+    // 3. Call Anthropic
+    const anthropicKey = process.env.ANTHROPIC_KEY;
+    if (!anthropicKey) {
+      throw new HttpsError("internal", "Anthropic key not configured.");
+    }
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": anthropicKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 400,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new HttpsError("internal", "Anthropic API call failed.");
+    }
+
+    const data = await response.json();
+    const text = (data.content?.[0]?.text || "").replace(/```json|```/g, "").trim();
+    const result = JSON.parse(text);
+
+    // 4. Increment eval count
+    await evalCountRef.set({ count: evalData.count + 1, updatedAt: Date.now() });
+
+    return result;
+  }
+);

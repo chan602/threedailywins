@@ -8,6 +8,7 @@ import FriendsTab from './tabs/FriendsTab'
 import ProfileTab from './tabs/ProfileTab'
 import TodayTab from './tabs/TodayTab'
 import { auth, db } from '../firebase'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 import { signOut, deleteUser } from 'firebase/auth'
 import {
   doc, onSnapshot,
@@ -15,8 +16,8 @@ import {
 } from 'firebase/firestore'
 import { v4 as uuidv4 } from 'uuid'
 
-const WORKER_URL = 'https://anthropic-proxy.emailtonathan.workers.dev/'
-const WORKER_SECRET = 'Biz11Start!'  // ← same string as the worker
+const functions = getFunctions()
+const evaluateWinFn = httpsCallable(functions, 'evaluateWin')
 
 // ── HELPERS ──────────────────────────────────────────────
 // ── MAIN COMPONENT ───────────────────────────────────────
@@ -584,21 +585,7 @@ Respond ONLY with valid JSON, no other text:
 {"physical": true or false, "mental": true or false, "spiritual": true or false, "reasoning": "one or two sentence explanation", "taskMap": {"task text": "physical"|"mental"|"spiritual"|null}}`
 
     try {
-      const response = await fetch(WORKER_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Secret': WORKER_SECRET
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 400,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      })
-      const data = await response.json()
-      const text = (data.content?.[0]?.text || '').replace(/```json|```/g, '').trim()
-      const result = JSON.parse(text)
+      const { data: result } = await evaluateWinFn({ prompt, type: 'today', date: todayStr() })
 
       const winsDoc = {
         date: todayStr(),
@@ -629,7 +616,11 @@ Respond ONLY with valid JSON, no other text:
       // onSnapshot will update todayWins state automatically
     } catch (e) {
       console.error('evaluateWins error:', e)
-      setEvalError('Evaluation failed — check connection and try again.')
+      if (e?.code === 'functions/resource-exhausted') {
+        setEvalError('Daily limit reached — 3 evals per day on free tier.')
+      } else {
+        setEvalError('Evaluation failed — check connection and try again.')
+      }
     }
     setEvalLoading(false)
   }
@@ -854,14 +845,7 @@ Respond ONLY with valid JSON, no other text:
 {"physical": true or false, "mental": true or false, "spiritual": true or false, "reasoning": "one or two sentence explanation", "taskMap": {"task text": "physical"|"mental"|"spiritual"|null}}`
 
     try {
-      const response = await fetch(WORKER_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-App-Secret': WORKER_SECRET },
-        body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 400, messages: [{ role: 'user', content: prompt }] })
-      })
-      const data = await response.json()
-      const text = (data.content?.[0]?.text || '').replace(/```json|```/g, '').trim()
-      const result = JSON.parse(text)
+      const { data: result } = await evaluateWinFn({ prompt, type: 'archive', date })
 
       const winsDoc = {
         date,
