@@ -1259,7 +1259,7 @@ Respond ONLY with valid JSON, no other text:
           </div>
         </div>
         {activeNav !== 'profile' && <div className={`home-stats${tutorialStep === 3 ? ' tutorial-highlight' : ''}`}>
-          <div className={`stat-pill stat-pill-clickable${isThreeWinDay(todayWins) ? ' stat-pill-win' : ''}`} onClick={() => setStreakPopupOpen(o => !o)} onMouseLeave={() => setStreakPopupOpen(false)} style={{ position: 'relative' }}>
+          <div className={`stat-pill stat-pill-clickable${streak.current > 0 ? ' stat-pill-win' : ''}`} onClick={() => setStreakPopupOpen(o => !o)} onMouseLeave={() => setStreakPopupOpen(false)} style={{ position: 'relative' }}>
             <span className="stat-val">{streak.current}</span>
             <span className="stat-label">streak</span>
             {streakPopupOpen && (
