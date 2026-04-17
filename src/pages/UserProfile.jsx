@@ -65,14 +65,20 @@ function UserProfile() {
         const streakSnap = await getDoc(doc(db, 'streak', uid, 'data', 'current'))
         if (streakSnap.exists()) setStreak(streakSnap.data())
 
-        // Compute global rank from leaderboard
-        const lbSnap = await getDocs(collection(db, 'leaderboard'))
-        const lbEntries = lbSnap.docs.map(d => d.data())
-        const sorted = [...lbEntries].sort((a, b) =>
-          (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0)
-        )
-        const rankIdx = sorted.findIndex(e => e.uid === uid)
-        setGlobalRank(rankIdx >= 0 ? rankIdx + 1 : null)
+        // Compute global rank — only possible for signed-in viewers
+        if (viewer?.uid) {
+          try {
+            const lbSnap = await getDocs(collection(db, 'leaderboard'))
+            const lbEntries = lbSnap.docs.map(d => d.data())
+            const sorted = [...lbEntries].sort((a, b) =>
+              (b.current ?? 0) - (a.current ?? 0) || (b.total ?? 0) - (a.total ?? 0)
+            )
+            const rankIdx = sorted.findIndex(e => e.uid === uid)
+            setGlobalRank(rankIdx >= 0 ? rankIdx + 1 : null)
+          } catch (e) {
+            // leaderboard not available for this viewer, skip silently
+          }
+        }
       }
 
       // 4. Load today's tasks if todo visibility allows
