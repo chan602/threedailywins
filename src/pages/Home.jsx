@@ -16,7 +16,7 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 
 const WORKER_URL = 'https://anthropic-proxy.emailtonathan.workers.dev/'
-const WORKER_SECRET = '3w-app-2026-xk9m'  // ← same string as the worker
+const WORKER_SECRET = 'Biz11Start!'  // ← same string as the worker
 
 // ── HELPERS ──────────────────────────────────────────────
 // ── MAIN COMPONENT ───────────────────────────────────────
