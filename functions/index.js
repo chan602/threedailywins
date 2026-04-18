@@ -208,7 +208,7 @@ exports.midnightRollover = onSchedule(
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
 exports.evaluateWin = onCall(
-  { memory: "256MiB", timeoutSeconds: 30 },
+  { memory: "256MiB", timeoutSeconds: 30, secrets: ["ANTHROPIC_KEY"] },
   async (request) => {
     // 1. Verify auth
     if (!request.auth) {
