@@ -269,3 +269,227 @@ exports.evaluateWin = onCall(
     return result;
   }
 );
+
+
+// ── SOCIAL FUNCTIONS ─────────────────────────────────────
+// Shared imports already loaded above (onCall, HttpsError)
+const { v4: uuidv4 } = require("uuid");
+
+// Helper — write a notification to a user's inbox
+async function writeNotif(recipientUid, notif) {
+  const id = uuidv4();
+  await db.doc(`notifications/${recipientUid}/items/${id}`).set({
+    id,
+    ...notif,
+    read: false,
+    createdAt: Date.now(),
+  });
+  return id;
+}
+
+// ── SEND KUDOS ───────────────────────────────────────────
+exports.sendKudos = onCall(
+  { memory: "256MiB", timeoutSeconds: 15 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
+    const { recipientUid, accomplishmentId, accomplishmentLabel, senderDisplayName } = request.data;
+    if (!recipientUid || !accomplishmentId) throw new HttpsError("invalid-argument", "Missing fields.");
+    if (request.auth.uid === recipientUid) throw new HttpsError("invalid-argument", "Can't kudos yourself.");
+
+    await writeNotif(recipientUid, {
+      type: "kudos",
+      senderUid: request.auth.uid,
+      senderDisplayName: senderDisplayName || "Someone",
+      accomplishmentId,
+      accomplishmentLabel,
+      message: `${senderDisplayName || "Someone"} gave you a thumbs up for: ${accomplishmentLabel}`,
+    });
+
+    return { success: true };
+  }
+);
+
+// ── SEND NUDGE ───────────────────────────────────────────
+exports.sendNudge = onCall(
+  { memory: "256MiB", timeoutSeconds: 15 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
+    const { recipientUid, taskText, senderDisplayName } = request.data;
+    if (!recipientUid || !taskText) throw new HttpsError("invalid-argument", "Missing fields.");
+    if (request.auth.uid === recipientUid) throw new HttpsError("invalid-argument", "Can't nudge yourself.");
+
+    await writeNotif(recipientUid, {
+      type: "nudge",
+      senderUid: request.auth.uid,
+      senderDisplayName: senderDisplayName || "Someone",
+      taskText,
+      message: `${senderDisplayName || "Someone"} nudged you: "${taskText}"`,
+    });
+
+    return { success: true };
+  }
+);
+
+// ── SEND CHALLENGE ───────────────────────────────────────
+exports.sendChallenge = onCall(
+  { memory: "256MiB", timeoutSeconds: 15 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
+    const { recipientUid, taskText, destination, senderDisplayName } = request.data;
+    // destination: 'today' | 'weekly'
+    if (!recipientUid || !taskText) throw new HttpsError("invalid-argument", "Missing fields.");
+    if (request.auth.uid === recipientUid) throw new HttpsError("invalid-argument", "Can't challenge yourself.");
+
+    const challengeId = uuidv4();
+    await db.doc(`challenges/${challengeId}`).set({
+      id: challengeId,
+      senderUid: request.auth.uid,
+      senderDisplayName: senderDisplayName || "Someone",
+      recipientUid,
+      taskText,
+      destination: destination || "today",
+      status: "pending",
+      createdAt: Date.now(),
+    });
+
+    await writeNotif(recipientUid, {
+      type: "challenge",
+      senderUid: request.auth.uid,
+      senderDisplayName: senderDisplayName || "Someone",
+      challengeId,
+      taskText,
+      destination: destination || "today",
+      message: `${senderDisplayName || "Someone"} challenged you: "${taskText}"`,
+    });
+
+    return { challengeId };
+  }
+);
+
+// ── RESPOND TO CHALLENGE (accept / decline) ──────────────
+exports.respondToChallenge = onCall(
+  { memory: "256MiB", timeoutSeconds: 15 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
+    const { challengeId, response: resp, notifId } = request.data;
+    // resp: 'accepted' | 'declined'
+    if (!challengeId || !resp) throw new HttpsError("invalid-argument", "Missing fields.");
+
+    const challengeRef = db.doc(`challenges/${challengeId}`);
+    const snap = await challengeRef.get();
+    if (!snap.exists) throw new HttpsError("not-found", "Challenge not found.");
+
+    const challenge = snap.data();
+    if (challenge.recipientUid !== request.auth.uid)
+      throw new HttpsError("permission-denied", "Not your challenge.");
+    if (challenge.status !== "pending")
+      throw new HttpsError("failed-precondition", "Challenge already responded to.");
+
+    await challengeRef.update({ status: resp, respondedAt: Date.now() });
+
+    // Mark notification read
+    if (notifId) {
+      await db.doc(`notifications/${request.auth.uid}/items/${notifId}`).update({ read: true });
+    }
+
+    if (resp === "accepted") {
+      // Drop task into recipient's today or weekly list
+      const uid = request.auth.uid;
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+      const newTask = {
+        id: uuidv4(),
+        text: challenge.taskText,
+        done: false,
+        carried: false,
+        carryCount: 0,
+        tag: "challenge",
+        challengeId,
+        challengerUid: challenge.senderUid,
+        challengerName: challenge.senderDisplayName,
+        createdAt: Date.now(),
+      };
+
+      if (challenge.destination === "weekly") {
+        const wKey = weekKeyFor(new Date());
+        const weekRef = db.doc(`tasks/${uid}/weekly/${wKey}`);
+        const wSnap = await weekRef.get();
+        const existing = wSnap.exists ? (wSnap.data().tasks || []) : [];
+        await weekRef.set({ tasks: [...existing, newTask], weekKey: wKey });
+      } else {
+        const todayRef = db.doc(`tasks/${uid}/today/data`);
+        const tSnap = await todayRef.get();
+        const existing = tSnap.exists ? (tSnap.data().tasks || []) : [];
+        await todayRef.set({ tasks: [...existing, newTask], date: today });
+      }
+
+      // Notify sender of acceptance
+      await writeNotif(challenge.senderUid, {
+        type: "challenge_accepted",
+        senderUid: uid,
+        senderDisplayName: request.auth.token?.name || "Your friend",
+        challengeId,
+        taskText: challenge.taskText,
+        message: `${request.auth.token?.name || "Your friend"} accepted your challenge: "${challenge.taskText}"`,
+      });
+    } else {
+      // Notify sender of decline
+      await writeNotif(challenge.senderUid, {
+        type: "challenge_declined",
+        senderUid: request.auth.uid,
+        senderDisplayName: request.auth.token?.name || "Your friend",
+        challengeId,
+        taskText: challenge.taskText,
+        message: `${request.auth.token?.name || "Your friend"} declined your challenge: "${challenge.taskText}"`,
+      });
+    }
+
+    return { success: true };
+  }
+);
+
+// ── COMPLETE CHALLENGE ───────────────────────────────────
+exports.completeChallenge = onCall(
+  { memory: "256MiB", timeoutSeconds: 15 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
+    const { challengeId, taskText } = request.data;
+    if (!challengeId) throw new HttpsError("invalid-argument", "Missing challengeId.");
+
+    const uid = request.auth.uid;
+    const challengeRef = db.doc(`challenges/${challengeId}`);
+    const snap = await challengeRef.get();
+    if (!snap.exists) throw new HttpsError("not-found", "Challenge not found.");
+
+    const challenge = snap.data();
+    if (challenge.recipientUid !== uid)
+      throw new HttpsError("permission-denied", "Not your challenge.");
+    if (challenge.status === "completed") return { success: true }; // idempotent
+
+    await challengeRef.update({ status: "completed", completedAt: Date.now() });
+
+    // Write accomplishment for recipient
+    const accomplishmentId = uuidv4();
+    await db.doc(`accomplishments/${uid}/items/${accomplishmentId}`).set({
+      id: accomplishmentId,
+      type: "challenge_completed",
+      challengeId,
+      taskText: taskText || challenge.taskText,
+      challengerUid: challenge.senderUid,
+      challengerName: challenge.senderDisplayName,
+      createdAt: Date.now(),
+    });
+
+    // Notify sender
+    await writeNotif(challenge.senderUid, {
+      type: "challenge_completed",
+      senderUid: uid,
+      senderDisplayName: request.auth.token?.name || "Your friend",
+      challengeId,
+      accomplishmentId,
+      taskText: taskText || challenge.taskText,
+      message: `${request.auth.token?.name || "Your friend"} completed your challenge: "${taskText || challenge.taskText}"`,
+    });
+
+    return { accomplishmentId };
+  }
+);

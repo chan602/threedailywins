@@ -5,10 +5,40 @@
 import { signOut } from 'firebase/auth'
 import { auth } from '../../firebase'
 
+function AccomplishmentIcon({ type }) {
+  if (type === 'challenge_completed') return <span style={{ fontSize: 16 }}>⚡</span>
+  if (type === 'streak_milestone')    return <span style={{ fontSize: 16 }}>🔥</span>
+  if (type === 'three_win_day')       return <span style={{ fontSize: 16 }}>⭐</span>
+  if (type === 'perfect_week')        return <span style={{ fontSize: 16 }}>🏆</span>
+  return <span style={{ fontSize: 16 }}>✓</span>
+}
+
+function accomplishmentLabel(a) {
+  if (a.type === 'challenge_completed') return `Completed: "${a.taskText}"`
+  if (a.type === 'streak_milestone')    return `${a.streakCount}-day streak`
+  if (a.type === 'three_win_day')       return `Three win day — ${a.date}`
+  if (a.type === 'perfect_week')        return `Perfect week — ${a.weekKey}`
+  return a.label || 'Achievement'
+}
+
+function timeAgo(ts) {
+  if (!ts) return ''
+  const diff = Date.now() - ts
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(diff / 3600000)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(diff / 86400000)
+  if (days < 30) return `${days}d ago`
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 export default function ProfileTab({
   user,
   userProfile,
   streak,
+  accomplishments,
+  onKudos,
   editBio,
   setEditBio,
   bioSaved,
@@ -83,6 +113,46 @@ export default function ProfileTab({
           <span className="profile-stat-val">{streak.total}</span>
           <span className="profile-stat-label">Total wins</span>
         </div>
+      </div>
+
+      {/* Accomplishments */}
+      <div className="profile-section">
+        <p className="profile-section-title">Accomplishments</p>
+        <p className="profile-section-sub">Recent milestones and completed challenges.</p>
+        {(!accomplishments || accomplishments.length === 0) ? (
+          <p className="empty-msg" style={{ marginTop: '0.5rem' }}>Nothing yet — complete challenges and hit streaks to earn accomplishments.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+            {accomplishments.slice(0, 20).map(a => (
+              <div key={a.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'var(--bg-card)', borderRadius: 10, padding: '0.6rem 0.75rem',
+                border: '1px solid var(--border)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                  <AccomplishmentIcon type={a.type} />
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {accomplishmentLabel(a)}
+                    </p>
+                    {a.challengerName && (
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-faint)' }}>from @{a.challengerName}</p>
+                    )}
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-faint)' }}>{timeAgo(a.createdAt)}</p>
+                  </div>
+                </div>
+                {onKudos && (
+                  <button
+                    className="profile-cancel-btn"
+                    style={{ marginLeft: '0.5rem', flexShrink: 0, fontSize: '1rem', padding: '0.25rem 0.6rem' }}
+                    onClick={() => onKudos(a)}
+                    title="Give kudos"
+                  >👍</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Bio */}

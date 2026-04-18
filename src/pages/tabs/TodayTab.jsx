@@ -58,6 +58,7 @@ export default function TodayTab({
   tapDailyRepeat,
   untapDailyRepeat,
   deleteDailyRepeat,
+  completeChallenge,
 }) {
   const doneTasks = todayTasks.filter(t => t.done).length
   const totalTasks = todayTasks.length
@@ -95,7 +96,12 @@ export default function TodayTab({
             {todayTasks.length === 0 && <p className="empty-msg">No tasks yet</p>}
             {[...todayTasks].sort((a, b) => a.done === b.done ? 0 : a.done ? 1 : -1).map((t, i) => (
               <div key={t.id} className={`task-item ${t.done ? 'done' : ''}`}>
-                <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => toggleTask('today', t.id)} />
+                <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => {
+                  toggleTask('today', t.id)
+                  if (!t.done && t.tag === 'challenge' && t.challengeId && completeChallenge) {
+                    completeChallenge(t.challengeId, t.text)
+                  }
+                }} />
                 <span className="task-num">T{i + 1}</span>
                 {editingTaskId === t.id ? (
                   <input
@@ -118,6 +124,11 @@ export default function TodayTab({
                       </span>
                     )}
                     {t.fromDTask && <span className="tag daily-tag">daily</span>}
+                    {t.tag === 'challenge' && (
+                      <span className="tag" style={{ background: 'var(--accent-muted)', color: 'var(--accent)', marginLeft: 4 }}>
+                        ⚡ {t.challengerName ? `from @${t.challengerName}` : 'challenge'}
+                      </span>
+                    )}
                   </span>
                 )}
                 <button className="delete-btn" onClick={() => deleteTask('today', t.id)}>×</button>

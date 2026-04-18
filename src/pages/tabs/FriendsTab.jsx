@@ -2,6 +2,8 @@
 // Extracted from Home.jsx. All state and logic lives in Home;
 // this component receives props and renders only.
 
+import { useState } from 'react'
+
 export default function FriendsTab({
   isGuest,
   navigate,
@@ -21,7 +23,51 @@ export default function FriendsTab({
   acceptRequest,
   declineRequest,
   removeFriend,
+  sendNudge,
+  sendChallenge,
 }) {
+  const [nudgeOpen, setNudgeOpen] = useState(null)   // uid of friend with open nudge box
+  const [nudgeText, setNudgeText] = useState('')
+  const [nudgeSending, setNudgeSending] = useState(false)
+  const [nudgeSent, setNudgeSent] = useState({})     // { [uid]: true }
+
+  const [challengeOpen, setChallengeOpen] = useState(null)  // uid of friend with open challenge box
+  const [challengeText, setChallengeText] = useState('')
+  const [challengeDest, setChallengeDest] = useState('today') // 'today' | 'weekly'
+  const [challengeSending, setChallengeSending] = useState(false)
+  const [challengeSent, setChallengeSent] = useState({})    // { [uid]: true }
+
+  async function handleChallenge(friend) {
+    if (!challengeText.trim() || challengeSending) return
+    setChallengeSending(true)
+    try {
+      await sendChallenge(friend.uid, challengeText.trim(), challengeDest)
+      setChallengeSent(prev => ({ ...prev, [friend.uid]: true }))
+      setChallengeOpen(null)
+      setChallengeText('')
+      setChallengeDest('today')
+      setTimeout(() => setChallengeSent(prev => ({ ...prev, [friend.uid]: false })), 3000)
+    } catch (e) {
+      console.error('challenge error:', e)
+    }
+    setChallengeSending(false)
+  }
+
+  async function handleNudge(friend) {
+    if (!nudgeText.trim() || nudgeSending) return
+    setNudgeSending(true)
+    try {
+      await sendNudge(friend.uid, nudgeText.trim())
+      setNudgeSent(prev => ({ ...prev, [friend.uid]: true }))
+      setNudgeOpen(null)
+      setNudgeText('')
+      setTimeout(() => setNudgeSent(prev => ({ ...prev, [friend.uid]: false })), 3000)
+    } catch (e) {
+      console.error('nudge error:', e)
+    }
+    setNudgeSending(false)
+  }
+
   if (isGuest) {
     return (
       <div className="friends-screen">
@@ -162,17 +208,103 @@ export default function FriendsTab({
           <p className="friends-empty">No friends yet — search for someone to add.</p>
         ) : (
           friendsList.map(f => (
-            <div key={f.id} className="friends-list-row">
-              <div className="lb-avatar">
-                {f.photoURL
-                  ? <img src={f.photoURL} alt="" className="profile-avatar-img" />
-                  : <span className="profile-avatar-initial">{(f.username || '?')[0].toUpperCase()}</span>
-                }
+            <div key={f.id} className="friends-list-row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                <div className="lb-avatar">
+                  {f.photoURL
+                    ? <img src={f.photoURL} alt="" className="profile-avatar-img" />
+                    : <span className="profile-avatar-initial">{(f.username || '?')[0].toUpperCase()}</span>
+                  }
+                </div>
+                <span className="friends-list-name" onClick={() => navigate(`/u/${f.username}`)}>
+                  @{f.username}
+                </span>
               </div>
-              <span className="friends-list-name" onClick={() => navigate(`/u/${f.username}`)}>
-                @{f.username}
-              </span>
-              <button className="friends-remove-btn" onClick={() => removeFriend(f.uid)}>Remove</button>
+              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                {nudgeSent[f.uid] ? (
+                  <span className="friends-status-msg friends-status-green" style={{ fontSize: '0.75rem' }}>Nudged!</span>
+                ) : (
+                  <button
+                    className="friends-view-btn"
+                    onClick={() => {
+                      setNudgeOpen(nudgeOpen === f.uid ? null : f.uid)
+                      setChallengeOpen(null)
+                      setNudgeText('')
+                    }}
+                  >
+                    {nudgeOpen === f.uid ? 'Cancel' : '👋 Nudge'}
+                  </button>
+                )}
+                {challengeSent[f.uid] ? (
+                  <span className="friends-status-msg friends-status-green" style={{ fontSize: '0.75rem' }}>Sent!</span>
+                ) : (
+                  <button
+                    className="friends-view-btn"
+                    onClick={() => {
+                      setChallengeOpen(challengeOpen === f.uid ? null : f.uid)
+                      setNudgeOpen(null)
+                      setChallengeText('')
+                      setChallengeDest('today')
+                    }}
+                  >
+                    {challengeOpen === f.uid ? 'Cancel' : '⚡ Challenge'}
+                  </button>
+                )}
+                <button className="friends-remove-btn" onClick={() => removeFriend(f.uid)}>Remove</button>
+              </div>
+              {nudgeOpen === f.uid && (
+                <div style={{ width: '100%', display: 'flex', gap: '0.4rem', marginTop: '0.25rem' }}>
+                  <input
+                    className="friends-input"
+                    placeholder="Task to nudge them with..."
+                    value={nudgeText}
+                    onChange={e => setNudgeText(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleNudge(f)}
+                    autoFocus
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="friends-search-btn"
+                    onClick={() => handleNudge(f)}
+                    disabled={nudgeSending || !nudgeText.trim()}
+                  >
+                    {nudgeSending ? '…' : 'Send'}
+                  </button>
+                </div>
+              )}
+              {challengeOpen === f.uid && (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
+                  <input
+                    className="friends-input"
+                    placeholder="Challenge task (e.g. 100 push ups)..."
+                    value={challengeText}
+                    onChange={e => setChallengeText(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleChallenge(f)}
+                    autoFocus
+                  />
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Add to:</span>
+                    <button
+                      className={`eval-mode-btn${challengeDest === 'today' ? ' active' : ''}`}
+                      onClick={() => setChallengeDest('today')}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                    >Today</button>
+                    <button
+                      className={`eval-mode-btn${challengeDest === 'weekly' ? ' active' : ''}`}
+                      onClick={() => setChallengeDest('weekly')}
+                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
+                    >Weekly</button>
+                    <button
+                      className="friends-search-btn"
+                      style={{ marginLeft: 'auto' }}
+                      onClick={() => handleChallenge(f)}
+                      disabled={challengeSending || !challengeText.trim()}
+                    >
+                      {challengeSending ? '…' : 'Send ⚡'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}

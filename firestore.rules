@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isFriend(uid) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/friends/$(uid)/list/$(request.auth.uid));
+    }
+    function visibilityOf(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.visibility;
+    }
+    function canSeeSection(uid, section) {
+      let vis = visibilityOf(uid)[section];
+      return isOwner(uid) ||
+        vis == 'public' ||
+        (vis == 'friends' && isFriend(uid));
+    }
+
+    // Anyone can read — needed for unauthenticated iframe + username search
+    match /users/{uid} {
+      allow read: if true;
+      allow write: if isOwner(uid);
+    }
+    match /tasks/{uid}/{rest=**} {
+      allow read: if isOwner(uid) || canSeeSection(uid, 'todo');
+      allow write: if isOwner(uid);
+    }
+    match /wins/{uid}/{rest=**} {
+      allow read: if isOwner(uid) || canSeeSection(uid, 'stats');
+      allow write: if isOwner(uid);
+    }
+    match /archive/{uid}/{rest=**} {
+      allow read: if isOwner(uid) || canSeeSection(uid, 'archive');
+      allow write: if isOwner(uid);
+    }
+    match /streak/{uid}/{rest=**} {
+      allow read: if isOwner(uid) || canSeeSection(uid, 'stats');
+      allow write: if isOwner(uid);
+    }
+    match /leaderboard/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid);
+    }
+    match /meta/{uid}/{rest=**} {
+      allow read, write: if isOwner(uid);
+    }
+    match /friends/{uid}/list/{friendUid} {
+      allow read: if isOwner(uid) || isOwner(friendUid);
+      allow write: if isOwner(uid);
+    }
+    match /friendRequests/{uid}/incoming/{senderUid} {
+      allow read: if isOwner(uid) || isOwner(senderUid);
+      allow create: if isSignedIn() && isOwner(senderUid);
+      allow delete: if isOwner(uid) || isOwner(senderUid);
+    }
+    match /announcements/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Notifications — owner reads/deletes own, any signed-in user can create
+    // (so friends can send kudos/nudges/challenges to you)
+    match /notifications/{uid}/items/{notifId} {
+      allow read, delete: if isOwner(uid);
+      allow create: if isSignedIn();
+      allow update: if isOwner(uid);
+    }
+
+    // Challenges — sender or recipient can read; only Cloud Functions write
+    // Client can create (send), recipient can update status (accept/decline/complete)
+    match /challenges/{challengeId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.senderUid ||
+        request.auth.uid == resource.data.recipientUid
+      );
+      allow create: if isSignedIn() &&
+        request.auth.uid == request.resource.data.senderUid;
+      allow update: if isSignedIn() && (
+        request.auth.uid == resource.data.senderUid ||
+        request.auth.uid == resource.data.recipientUid
+      );
+    }
+
+    // Accomplishments — owner writes own, friends/public can read per visibility
+    match /accomplishments/{uid}/items/{itemId} {
+      allow read: if isOwner(uid) || canSeeSection(uid, 'stats');
+      allow write: if isOwner(uid);
+    }
+  }
+}

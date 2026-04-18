@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { auth, db } from '../firebase'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 import {
   collection, doc, getDoc, getDocs, query, where
 } from 'firebase/firestore'
 import { todayStr, isThreeWinDay, getWeekKeyForDate, weekLabelFromKey } from './tabs/utils'
+
+const functions = getFunctions()
+const sendKudosFn = httpsCallable(functions, 'sendKudos')
 
 function UserProfile() {
   const { username } = useParams()
@@ -23,6 +27,8 @@ function UserProfile() {
   const [expandedDays, setExpandedDays] = useState({})   // { [date]: bool }
   const [expandedWeeks, setExpandedWeeks] = useState({}) // { [weekKey]: bool }
   const [globalRank, setGlobalRank] = useState(null)
+  const [accomplishments, setAccomplishments] = useState([])
+  const [kudosSent, setKudosSent] = useState({}) // { [accomplishmentId]: true }
 
   useEffect(() => {
     loadProfile()
@@ -109,6 +115,14 @@ function UserProfile() {
         setArchiveDays(null) // explicitly hidden
       }
 
+      // 6. Load accomplishments if stats visibility allows
+      if (canSee(visibility.stats)) {
+        const accSnap = await getDocs(collection(db, 'accomplishments', uid, 'items'))
+        const items = accSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+        items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        setAccomplishments(items)
+      }
+
     } catch (e) {
       console.error('loadProfile error:', e)
     }
@@ -139,6 +153,49 @@ function UserProfile() {
   const doneTasks = todayTasks ? todayTasks.filter(t => t.done).length : 0
   const totalTasks = todayTasks ? todayTasks.length : 0
   const pct = totalTasks === 0 ? 0 : Math.round(doneTasks / totalTasks * 100)
+
+  function accomplishmentLabel(a) {
+    if (a.type === 'challenge_completed') return `Completed: "${a.taskText}"`
+    if (a.type === 'streak_milestone')    return `${a.streakCount}-day streak`
+    if (a.type === 'three_win_day')       return `Three win day — ${a.date}`
+    if (a.type === 'perfect_week')        return `Perfect week — ${a.weekKey}`
+    return a.label || 'Achievement'
+  }
+
+  function accomplishmentIcon(type) {
+    if (type === 'challenge_completed') return '⚡'
+    if (type === 'streak_milestone')    return '🔥'
+    if (type === 'three_win_day')       return '⭐'
+    if (type === 'perfect_week')        return '🏆'
+    return '✓'
+  }
+
+  function timeAgo(ts) {
+    if (!ts) return ''
+    const diff = Date.now() - ts
+    const mins = Math.floor(diff / 60000)
+    if (mins < 60) return `${mins}m ago`
+    const hrs = Math.floor(diff / 3600000)
+    if (hrs < 24) return `${hrs}h ago`
+    const days = Math.floor(diff / 86400000)
+    if (days < 30) return `${days}d ago`
+    return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  async function handleKudos(a) {
+    if (!viewer || isOwn || kudosSent[a.id]) return
+    try {
+      await sendKudosFn({
+        recipientUid: profile.uid,
+        accomplishmentId: a.id,
+        accomplishmentLabel: accomplishmentLabel(a),
+        senderDisplayName: viewer.displayName || viewer.email?.split('@')[0] || 'Someone',
+      })
+      setKudosSent(prev => ({ ...prev, [a.id]: true }))
+    } catch (e) {
+      console.error('kudos error:', e)
+    }
+  }
 
   return (
     <div className="upro-shell">
@@ -182,6 +239,44 @@ function UserProfile() {
       ) : (
         <div className="upro-hidden-section">
           <p className="upro-hidden-msg">Stats are private.</p>
+        </div>
+      )}
+
+      {/* Accomplishments */}
+      {accomplishments.length > 0 && (
+        <div className="upro-section">
+          <span className="upro-section-title">Accomplishments</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+            {accomplishments.slice(0, 10).map(a => (
+              <div key={a.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'var(--bg-card)', borderRadius: 10, padding: '0.6rem 0.75rem',
+                border: '1px solid var(--border)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 16 }}>{accomplishmentIcon(a.type)}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {accomplishmentLabel(a)}
+                    </p>
+                    {a.challengerName && (
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-faint)' }}>from @{a.challengerName}</p>
+                    )}
+                    <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-faint)' }}>{timeAgo(a.createdAt)}</p>
+                  </div>
+                </div>
+                {!isOwn && viewer && (
+                  <button
+                    className="profile-cancel-btn"
+                    style={{ marginLeft: '0.5rem', flexShrink: 0, fontSize: '1rem', padding: '0.25rem 0.6rem', opacity: kudosSent[a.id] ? 0.4 : 1 }}
+                    onClick={() => handleKudos(a)}
+                    disabled={!!kudosSent[a.id]}
+                    title={kudosSent[a.id] ? 'Kudos sent!' : 'Give kudos'}
+                  >👍</button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

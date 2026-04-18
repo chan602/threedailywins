@@ -17,7 +17,12 @@ import {
 import { v4 as uuidv4 } from 'uuid'
 
 const functions = getFunctions()
-const evaluateWinFn = httpsCallable(functions, 'evaluateWin')
+const evaluateWinFn        = httpsCallable(functions, 'evaluateWin')
+const sendKudosFn          = httpsCallable(functions, 'sendKudos')
+const sendNudgeFn          = httpsCallable(functions, 'sendNudge')
+const sendChallengeFn      = httpsCallable(functions, 'sendChallenge')
+const respondToChallengeFn = httpsCallable(functions, 'respondToChallenge')
+const completeChallengeFn  = httpsCallable(functions, 'completeChallenge')
 
 // ── HELPERS ──────────────────────────────────────────────
 // ── MAIN COMPONENT ───────────────────────────────────────
@@ -64,6 +69,7 @@ function Home({ isGuest = false }) {
   // Streak state
   const [streak, setStreak] = useState({ current: 0, total: 0, best: 0 })
   const [streakPopupOpen, setStreakPopupOpen] = useState(false)
+  const [accomplishments, setAccomplishments] = useState([])
   const [rankPopupOpen, setRankPopupOpen] = useState(false)
 
   // Friends search state
@@ -130,6 +136,7 @@ function Home({ isGuest = false }) {
   const [notifUnread, setNotifUnread] = useState(false)
   const [announcements, setAnnouncements] = useState([])  // stored in localStorage
   const [showPwaNotif, setShowPwaNotif] = useState(false)
+  const [socialNotifs, setSocialNotifs] = useState([])
 
 
   // ── FIREBASE REFS ─────────────────────────────────────
@@ -220,8 +227,9 @@ function Home({ isGuest = false }) {
     const hasUnreadAnnouncement = announcements.some(a => !a.read)
     const hasUnreadRequest = incomingRequests.length > 0
     const hasUnreadPwa = showPwaNotif
-    setNotifUnread(hasUnreadAnnouncement || hasUnreadRequest || hasUnreadPwa)
-  }, [announcements, incomingRequests, showPwaNotif])
+    const hasUnreadSocial = socialNotifs.some(n => !n.read)
+    setNotifUnread(hasUnreadAnnouncement || hasUnreadRequest || hasUnreadPwa || hasUnreadSocial)
+  }, [announcements, incomingRequests, showPwaNotif, socialNotifs])
 
   // ── ROLLOVER ──────────────────────────────────────────
   useEffect(() => {
@@ -391,6 +399,30 @@ function Home({ isGuest = false }) {
       setFriendsList(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
     return () => { unsubReq(); unsubFriends() }
+  }, [uid])
+
+  // ── ACCOMPLISHMENTS LISTENER ──────────────────────────
+  useEffect(() => {
+    if (!uid || isGuest) return
+    const accRef = collection(db, 'accomplishments', uid, 'items')
+    const unsub = onSnapshot(accRef, snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      setAccomplishments(items)
+    })
+    return () => unsub()
+  }, [uid])
+
+  // ── SOCIAL NOTIFICATIONS LISTENER ────────────────────
+  useEffect(() => {
+    if (!uid || isGuest) return
+    const notifRef = collection(db, 'notifications', uid, 'items')
+    const unsub = onSnapshot(notifRef, snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+      setSocialNotifs(items)
+    })
+    return () => unsub()
   }, [uid])
 
   // ── LOAD ARCHIVE (when tab switches to archive) ───────
@@ -989,6 +1021,48 @@ Respond ONLY with valid JSON, no other text:
     }
   }
 
+  async function handleKudos(accomplishment) {
+    if (!uid || !accomplishment) return
+    try {
+      await sendKudosFn({
+        recipientUid: uid,
+        accomplishmentId: accomplishment.id,
+        accomplishmentLabel: accomplishment.taskText || accomplishment.label || 'an achievement',
+        senderDisplayName: userProfile?.username || user?.displayName || 'Someone',
+      })
+    } catch (e) {
+      console.error('kudos error:', e)
+    }
+  }
+
+  async function handleCompleteChallenge(challengeId, taskText) {
+    if (!uid || !challengeId) return
+    try {
+      await completeChallengeFn({ challengeId, taskText })
+    } catch (e) {
+      console.error('completeChallenge error:', e)
+    }
+  }
+
+  async function handleSendNudge(recipientUid, taskText) {
+    if (!uid) return
+    await sendNudgeFn({
+      recipientUid,
+      taskText,
+      senderDisplayName: userProfile?.username || user?.displayName || 'Someone',
+    })
+  }
+
+  async function handleSendChallenge(recipientUid, taskText, destination) {
+    if (!uid) return
+    await sendChallengeFn({
+      recipientUid,
+      taskText,
+      destination,
+      senderDisplayName: userProfile?.username || user?.displayName || 'Someone',
+    })
+  }
+
   async function sendFriendRequest() {
     if (!searchedUser || !uid) return
     const targetUid = searchedUser.uid
@@ -1074,6 +1148,13 @@ Respond ONLY with valid JSON, no other text:
       localStorage.setItem('notif_announcements', JSON.stringify(updated))
       return updated
     })
+    // Mark all social notifs as read in Firestore
+    if (uid) {
+      socialNotifs.filter(n => !n.read).forEach(n => {
+        setDoc(doc(db, 'notifications', uid, 'items', n.id), { ...n, read: true })
+      })
+      setSocialNotifs(prev => prev.map(n => ({ ...n, read: true })))
+    }
   }
 
   function dismissAnnouncement(id) {
@@ -1087,6 +1168,21 @@ Respond ONLY with valid JSON, no other text:
   function dismissPwaNotif() {
     localStorage.setItem('pwa_notif_dismissed', '1')
     setShowPwaNotif(false)
+  }
+
+  async function dismissSocialNotif(notifId) {
+    if (!uid) return
+    await deleteDoc(doc(db, 'notifications', uid, 'items', notifId))
+    setSocialNotifs(prev => prev.filter(n => n.id !== notifId))
+  }
+
+  async function handleRespondToChallenge(notif, response) {
+    try {
+      await respondToChallengeFn({ challengeId: notif.challengeId, response, notifId: notif.id })
+      setSocialNotifs(prev => prev.filter(n => n.id !== notif.id))
+    } catch (e) {
+      console.error('respondToChallenge error:', e)
+    }
   }
 
   // ── ARCHIVE HELPERS ───────────────────────────────────
@@ -1221,6 +1317,32 @@ Respond ONLY with valid JSON, no other text:
                     </div>
                   ))}
 
+                  {/* Social notifications */}
+                  {socialNotifs.map(n => (
+                    <div key={n.id} className={`notif-item ${n.read ? '' : 'notif-item-unread'}`}>
+                      <div className="notif-item-body">
+                        <p className="notif-item-title">
+                          {n.type === 'kudos'              && '👍 Kudos'}
+                          {n.type === 'nudge'              && '👋 Nudge'}
+                          {n.type === 'challenge'          && '⚡ Challenge'}
+                          {n.type === 'challenge_accepted' && '✅ Challenge accepted'}
+                          {n.type === 'challenge_declined' && '❌ Challenge declined'}
+                          {n.type === 'challenge_completed'&& '🏆 Challenge completed'}
+                        </p>
+                        <p className="notif-item-msg">{n.message}</p>
+                        {n.type === 'challenge' && (
+                          <div className="notif-item-actions">
+                            <button className="friends-accept-btn" onClick={() => handleRespondToChallenge(n, 'accepted')}>Accept</button>
+                            <button className="friends-decline-btn" onClick={() => handleRespondToChallenge(n, 'declined')}>Decline</button>
+                          </div>
+                        )}
+                      </div>
+                      {n.type !== 'challenge' && (
+                        <button className="notif-item-dismiss" onClick={() => dismissSocialNotif(n.id)}>✕</button>
+                      )}
+                    </div>
+                  ))}
+
                   {/* Announcements */}
                   {announcements.map(a => (
                     <div key={a.id} className={`notif-item ${a.read ? '' : 'notif-item-unread'}`}>
@@ -1233,7 +1355,7 @@ Respond ONLY with valid JSON, no other text:
                   ))}
 
                   {/* Empty state */}
-                  {!showPwaNotif && incomingRequests.length === 0 && announcements.length === 0 && (
+                  {!showPwaNotif && incomingRequests.length === 0 && announcements.length === 0 && socialNotifs.length === 0 && (
                     <p className="notif-empty">No notifications</p>
                   )}
                 </div>
@@ -1345,6 +1467,7 @@ Respond ONLY with valid JSON, no other text:
             tapDailyRepeat={tapDailyRepeat}
             untapDailyRepeat={untapDailyRepeat}
             deleteDailyRepeat={deleteDailyRepeat}
+            completeChallenge={handleCompleteChallenge}
           />
         )}
 
@@ -1369,6 +1492,8 @@ Respond ONLY with valid JSON, no other text:
             acceptRequest={acceptRequest}
             declineRequest={declineRequest}
             removeFriend={removeFriend}
+            sendNudge={handleSendNudge}
+            sendChallenge={handleSendChallenge}
           />
         )}
 
@@ -1392,6 +1517,8 @@ Respond ONLY with valid JSON, no other text:
             user={user}
             userProfile={userProfile}
             streak={streak}
+            accomplishments={accomplishments}
+            onKudos={handleKudos}
             editBio={editBio}
             setEditBio={setEditBio}
             bioSaved={bioSaved}
