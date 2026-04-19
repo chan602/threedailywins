@@ -711,7 +711,7 @@ Respond ONLY with valid JSON, no other text:
 
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    const yStr = yesterday.toLocaleDateString('en-CA')
+    const yStr = yesterday.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
     const today = todayStr()
 
     if (todayIsWin) {
