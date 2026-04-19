@@ -296,6 +296,13 @@ exports.sendKudos = onCall(
     if (!recipientUid || !accomplishmentId) throw new HttpsError("invalid-argument", "Missing fields.");
     if (request.auth.uid === recipientUid) throw new HttpsError("invalid-argument", "Can't kudos yourself.");
 
+    // Increment kudosCount on the accomplishment doc
+    const accRef = db.doc(`accomplishments/${recipientUid}/items/${accomplishmentId}`);
+    const accSnap = await accRef.get();
+    if (accSnap.exists) {
+      await accRef.update({ kudosCount: (accSnap.data().kudosCount || 0) + 1 });
+    }
+
     await writeNotif(recipientUid, {
       type: "kudos",
       senderUid: request.auth.uid,

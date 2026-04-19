@@ -8,7 +8,8 @@ import {
 import { todayStr, isThreeWinDay, getWeekKeyForDate, weekLabelFromKey } from './tabs/utils'
 
 const functions = getFunctions()
-const sendKudosFn = httpsCallable(functions, 'sendKudos')
+const sendKudosFn  = httpsCallable(functions, 'sendKudos')
+const sendNudgeFn  = httpsCallable(functions, 'sendNudge')
 
 function UserProfile() {
   const { username } = useParams()
@@ -29,6 +30,10 @@ function UserProfile() {
   const [globalRank, setGlobalRank] = useState(null)
   const [accomplishments, setAccomplishments] = useState([])
   const [kudosSent, setKudosSent] = useState({}) // { [accomplishmentId]: true }
+  const [nudgingTaskId, setNudgingTaskId] = useState(null) // task id with open nudge input
+  const [nudgeText, setNudgeText] = useState('')
+  const [nudgeSending, setNudgeSending] = useState(false)
+  const [nudgeSentIds, setNudgeSentIds] = useState({}) // { [taskId]: true }
 
   useEffect(() => {
     loadProfile()
@@ -197,6 +202,26 @@ function UserProfile() {
     }
   }
 
+  async function handleNudge(task) {
+    const text = nudgeText.trim() || task.text
+    if (!text || nudgeSending) return
+    setNudgeSending(true)
+    try {
+      await sendNudgeFn({
+        recipientUid: profile.uid,
+        taskText: text,
+        senderDisplayName: viewer?.displayName || viewer?.email?.split('@')[0] || 'Someone',
+      })
+      setNudgeSentIds(prev => ({ ...prev, [task.id]: true }))
+      setNudgingTaskId(null)
+      setNudgeText('')
+      setTimeout(() => setNudgeSentIds(prev => ({ ...prev, [task.id]: false })), 3000)
+    } catch (e) {
+      console.error('nudge error:', e)
+    }
+    setNudgeSending(false)
+  }
+
   return (
     <div className="upro-shell">
 
@@ -265,15 +290,22 @@ function UserProfile() {
                     <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-faint)' }}>{timeAgo(a.createdAt)}</p>
                   </div>
                 </div>
-                {!isOwn && viewer && (
-                  <button
-                    className="profile-cancel-btn"
-                    style={{ marginLeft: '0.5rem', flexShrink: 0, fontSize: '1rem', padding: '0.25rem 0.6rem', opacity: kudosSent[a.id] ? 0.4 : 1 }}
-                    onClick={() => handleKudos(a)}
-                    disabled={!!kudosSent[a.id]}
-                    title={kudosSent[a.id] ? 'Kudos sent!' : 'Give kudos'}
-                  >👍</button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                  {(a.kudosCount > 0) && (
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>
+                      👍 {a.kudosCount}
+                    </span>
+                  )}
+                  {!isOwn && viewer && (
+                    <button
+                      className="profile-cancel-btn"
+                      style={{ marginLeft: '0.25rem', flexShrink: 0, fontSize: '1rem', padding: '0.25rem 0.6rem', opacity: kudosSent[a.id] ? 0.4 : 1 }}
+                      onClick={() => handleKudos(a)}
+                      disabled={!!kudosSent[a.id]}
+                      title={kudosSent[a.id] ? 'Kudos sent!' : 'Give kudos'}
+                    >👍</button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -321,14 +353,53 @@ function UserProfile() {
         ) : (
           <div className="task-list">
             {todayTasks.map((t, i) => (
-              <div key={t.id || i} className={`task-item ${t.done ? 'done' : ''}`}>
-                <span className={`upro-task-dot ${t.done ? 'done' : ''}`} />
-                <span className="task-num">T{i + 1}</span>
-                <span className="task-text">
-                  {t.text}
-                  {t.carried && <span className="tag carried-tag">carried</span>}
-                  {t.fromDTask && <span className="tag daily-tag">daily</span>}
-                </span>
+              <div key={t.id || i} style={{ flexDirection: 'column', alignItems: 'stretch' }} className={`task-item ${t.done ? 'done' : ''}`}>
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                  <span className={`upro-task-dot ${t.done ? 'done' : ''}`} />
+                  <span className="task-num">T{i + 1}</span>
+                  <span className="task-text" style={{ flex: 1 }}>
+                    {t.text}
+                    {t.carried && <span className="tag carried-tag">carried</span>}
+                    {t.fromDTask && <span className="tag daily-tag">daily</span>}
+                  </span>
+                  {!isOwn && viewer && (
+                    nudgeSentIds[t.id || i] ? (
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)', marginLeft: '0.5rem' }}>Nudged!</span>
+                    ) : (
+                      <button
+                        className="profile-cancel-btn"
+                        style={{ marginLeft: '0.5rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', flexShrink: 0 }}
+                        onClick={() => {
+                          setNudgingTaskId(nudgingTaskId === (t.id || i) ? null : (t.id || i))
+                          setNudgeText(t.text)
+                        }}
+                      >
+                        {nudgingTaskId === (t.id || i) ? 'Cancel' : '👋'}
+                      </button>
+                    )
+                  )}
+                </div>
+                {nudgingTaskId === (t.id || i) && (
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem', paddingLeft: '1.5rem' }}>
+                    <input
+                      className="friends-input"
+                      value={nudgeText}
+                      onChange={e => setNudgeText(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleNudge(t)}
+                      placeholder="Edit nudge message..."
+                      autoFocus
+                      style={{ flex: 1, fontSize: '0.8rem' }}
+                    />
+                    <button
+                      className="friends-search-btn"
+                      onClick={() => handleNudge(t)}
+                      disabled={nudgeSending || !nudgeText.trim()}
+                      style={{ fontSize: '0.8rem' }}
+                    >
+                      {nudgeSending ? '…' : 'Send'}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -52,6 +52,7 @@ function Home({ isGuest = false }) {
   const [todayWins, setTodayWins] = useState(null) // { physical, mental, spiritual, reasoning, taskMap, evaluatedAt, overridePhysical, overrideMental, overrideSpiritual }
   const [evalLoading, setEvalLoading] = useState(false)
   const [evalError, setEvalError] = useState('')
+  const [evalsToday, setEvalsToday] = useState(0)
   const [addFlash, setAddFlash] = useState(false)       // + button flash on task add
   const [evalFlash, setEvalFlash] = useState({})        // { physical: true, mental: true, spiritual: true } after eval
 
@@ -70,7 +71,6 @@ function Home({ isGuest = false }) {
   const [streak, setStreak] = useState({ current: 0, total: 0, best: 0 })
   const [streakPopupOpen, setStreakPopupOpen] = useState(false)
   const [accomplishments, setAccomplishments] = useState([])
-  const [rankPopupOpen, setRankPopupOpen] = useState(false)
 
   // Friends search state
   const [friendSearch, setFriendSearch] = useState('')
@@ -401,6 +401,16 @@ function Home({ isGuest = false }) {
     return () => { unsubReq(); unsubFriends() }
   }, [uid])
 
+  // ── EVAL COUNT LISTENER ───────────────────────────────
+  useEffect(() => {
+    if (!uid || isGuest) return
+    const evalCountRef = doc(db, 'meta', uid, 'evalCount', todayStr())
+    const unsub = onSnapshot(evalCountRef, snap => {
+      setEvalsToday(snap.exists() ? (snap.data().count || 0) : 0)
+    })
+    return () => unsub()
+  }, [uid])
+
   // ── ACCOMPLISHMENTS LISTENER ──────────────────────────
   useEffect(() => {
     if (!uid || isGuest) return
@@ -705,19 +715,30 @@ Respond ONLY with valid JSON, no other text:
     const today = todayStr()
 
     if (todayIsWin) {
-      if (lastWinDate !== today) {
-        current = (lastWinDate === yStr) ? current + 1 : 1
+      if (lastWinDate === today) {
+        // Already counted today — no change needed
+      } else if (lastWinDate === yStr) {
+        // Extending streak from yesterday
+        current = current + 1
         total = (total || 0) + 1
         best = Math.max(best || 0, current)
         lastWinDate = today
+      } else {
+        // Gap in streak — start fresh
+        current = 1
+        total = (total || 0) + 1
+        best = Math.max(best || 0, 1)
+        lastWinDate = today
       }
     } else {
-      // If today was previously counted as a win but now isn't (override removed it)
+      // Not a three-win day after re-eval
       if (lastWinDate === today) {
+        // Today was previously a win, roll it back
         current = Math.max(0, current - 1)
         total = Math.max(0, total - 1)
-        lastWinDate = yStr // roll back to yesterday
+        lastWinDate = yStr
       }
+      // else: today was never counted, nothing to change
     }
 
     await setDoc(streakRef, { current, total, best, lastWinDate })
@@ -1381,21 +1402,9 @@ Respond ONLY with valid JSON, no other text:
               </div>
             )}
           </div>
-          <div className="stat-pill stat-pill-clickable" onClick={() => setRankPopupOpen(o => !o)} onMouseLeave={() => setRankPopupOpen(false)} style={{ position: 'relative' }}>
+          <div className="stat-pill">
             <span className={`stat-val${globalRank === 1 ? ' rank-gold' : globalRank === 2 ? ' rank-silver' : globalRank === 3 ? ' rank-bronze' : ''}`}>{globalRank ? `#${globalRank}` : '—'}</span>
             <span className="stat-label">rank</span>
-            {rankPopupOpen && (
-              <div className="streak-popup">
-                <div className="streak-popup-row">
-                  <span className="streak-popup-label">Global</span>
-                  <span className="streak-popup-val">{globalRank ? `#${globalRank}` : '—'}</span>
-                </div>
-                <div className="streak-popup-row">
-                  <span className="streak-popup-label">Friends</span>
-                  <span className="streak-popup-val">{friendRank ? `#${friendRank}` : '—'}</span>
-                </div>
-              </div>
-            )}
           </div>
           <div className="stat-pill"><span className="stat-val">{streak.total}</span><span className="stat-label">total wins</span></div>
         </div>}
@@ -1444,6 +1453,7 @@ Respond ONLY with valid JSON, no other text:
             todayWins={todayWins}
             evalLoading={evalLoading}
             evalError={evalError}
+            evalsToday={evalsToday}
             evaluateWins={evaluateWins}
             evalFlash={evalFlash}
             getEffectiveWin={getEffectiveWin}

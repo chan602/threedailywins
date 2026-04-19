@@ -32,6 +32,7 @@ export default function TodayTab({
   todayWins,
   evalLoading,
   evalError,
+  evalsToday,
   evaluateWins,
   evalFlash,
   getEffectiveWin,
@@ -144,7 +145,7 @@ export default function TodayTab({
                 {evalLoading ? 'Evaluating…' : todayWins?.evaluatedAt ? 'Re-evaluate' : 'Evaluate'}
               </button>
             </div>
-            <p className="eval-scope-note">Evaluated from today's to-do list only. 3 per day.</p>
+            <p className="eval-scope-note">Evaluated from today's to-do list only. {evalsToday}/3 evals used today.</p>
 
             {evalTime && <p className="eval-meta">Evaluated at {evalTime} · Powered by Claude AI</p>}
             {evalError && <p className="eval-error">{evalError}</p>}

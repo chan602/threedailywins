@@ -141,14 +141,21 @@ export default function ProfileTab({
                     <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-faint)' }}>{timeAgo(a.createdAt)}</p>
                   </div>
                 </div>
-                {onKudos && (
-                  <button
-                    className="profile-cancel-btn"
-                    style={{ marginLeft: '0.5rem', flexShrink: 0, fontSize: '1rem', padding: '0.25rem 0.6rem' }}
-                    onClick={() => onKudos(a)}
-                    title="Give kudos"
-                  >👍</button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+                  {(a.kudosCount > 0) && (
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)', marginRight: '0.1rem' }}>
+                      👍 {a.kudosCount}
+                    </span>
+                  )}
+                  {onKudos && (
+                    <button
+                      className="profile-cancel-btn"
+                      style={{ marginLeft: '0.25rem', flexShrink: 0, fontSize: '1rem', padding: '0.25rem 0.6rem' }}
+                      onClick={() => onKudos(a)}
+                      title="Give kudos"
+                    >👍</button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
