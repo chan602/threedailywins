@@ -1115,7 +1115,7 @@ Respond ONLY with valid JSON, no other text:
   async function grantPro() {
     if (!uid) return
     setProLoading(true)
-    const updated = { ...userProfile, isPro: true }
+    const updated = { ...userProfile, isPro: !userProfile?.isPro }
     await setDoc(doc(db, 'users', uid), updated)
     setUserProfile(updated)
     setProLoading(false)
@@ -1257,14 +1257,22 @@ Respond ONLY with valid JSON, no other text:
     setChallengeError('')
     try {
       if (!notif.challengeId) {
-        setChallengeError('Challenge ID missing — try dismissing and re-opening the notification.')
+        setChallengeError('Challenge ID missing — dismiss and ask your friend to resend.')
         return
       }
       await respondToChallengeFn({ challengeId: notif.challengeId, response, notifId: notif.id })
+      // Remove from Firestore so it doesn't reappear on next snapshot
+      await deleteDoc(doc(db, 'notifications', uid, 'items', notif.id))
       setSocialNotifs(prev => prev.filter(n => n.id !== notif.id))
     } catch (e) {
       console.error('respondToChallenge error:', e)
-      setChallengeError('Something went wrong — please try again.')
+      if (e?.message?.includes('already responded')) {
+        // Stale notif — just dismiss it
+        await deleteDoc(doc(db, 'notifications', uid, 'items', notif.id))
+        setSocialNotifs(prev => prev.filter(n => n.id !== notif.id))
+      } else {
+        setChallengeError('Something went wrong — please try again.')
+      }
     }
   }
 

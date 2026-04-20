@@ -212,7 +212,14 @@ export default function FriendsTab({
                       setChallengeDest('today')
                     }}
                   >
-                    {challengeOpen === f.uid ? 'Cancel' : '⚡ Challenge'}
+                    {challengeOpen === f.uid ? 'Cancel' : (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                        </svg>
+                        Challenge
+                      </span>
+                    )}
                   </button>
                 )}
                 <button className="friends-remove-btn" onClick={() => removeFriend(f.uid)}>Remove</button>
@@ -245,7 +252,14 @@ export default function FriendsTab({
                       onClick={() => handleChallenge(f)}
                       disabled={challengeSending || !challengeText.trim()}
                     >
-                      {challengeSending ? '…' : 'Send ⚡'}
+                      {challengeSending ? '…' : (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          Send
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                          </svg>
+                        </span>
+                      )}
                     </button>
                   </div>
                 </div>

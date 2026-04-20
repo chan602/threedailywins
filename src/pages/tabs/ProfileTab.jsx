@@ -102,8 +102,8 @@ function AccomplishmentCard({ a, onKudos }) {
   )
 }
 
-function PillBox({ title, count, defaultOpen, children }) {
-  const [open, setOpen] = useState(defaultOpen ?? true)
+function PillBox({ title, count, preview, children }) {
+  const [open, setOpen] = useState(false)
   return (
     <div style={{ marginBottom: '0.5rem' }}>
       <button
@@ -112,16 +112,23 @@ function PillBox({ title, count, defaultOpen, children }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)',
           borderRadius: open ? '10px 10px 0 0' : 10, padding: '0.6rem 0.75rem',
-          cursor: 'pointer', color: 'var(--text)'
+          cursor: 'pointer', color: 'var(--text)', textAlign: 'left'
         }}
       >
-        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{title}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{title}</span>
+          {!open && preview && (
+            <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', color: 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {preview}
+            </p>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, marginLeft: '0.5rem' }}>
           {count > 0 && (
             <span style={{ fontSize: '0.72rem', background: 'var(--accent-light)', color: 'var(--accent-text)', borderRadius: 20, padding: '0.1rem 0.5rem' }}>{count}</span>
           )}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-            style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+            style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>
             <polyline points="6 9 12 15 18 9"/>
           </svg>
         </div>
@@ -144,14 +151,14 @@ function AccomplishmentsSection({ accomplishments, onKudos }) {
       <p className="profile-section-title">Accomplishments</p>
       <p className="profile-section-sub" style={{ marginBottom: '0.75rem' }}>Milestones and completed challenges.</p>
 
-      <PillBox title="Trophy Case" count={milestones.length} defaultOpen={true}>
+      <PillBox title="Trophy Case" count={milestones.length} preview={milestones[0] ? accomplishmentLabel(milestones[0]) : null}>
         {milestones.length === 0
           ? <p className="empty-msg" style={{ padding: '0.25rem 0' }}>Hit streaks and three-win days to earn trophies.</p>
           : milestones.slice(0, 20).map(a => <AccomplishmentCard key={a.id} a={a} onKudos={onKudos} />)
         }
       </PillBox>
 
-      <PillBox title="Challenges" count={challenges.length} defaultOpen={true}>
+      <PillBox title="Challenges" count={challenges.length} preview={challenges[0] ? accomplishmentLabel(challenges[0]) : null}>
         {challenges.length === 0
           ? <p className="empty-msg" style={{ padding: '0.25rem 0' }}>Complete challenges from friends to earn cards here.</p>
           : challenges.slice(0, 20).map(a => <AccomplishmentCard key={a.id} a={a} onKudos={onKudos} />)
@@ -239,7 +246,17 @@ export default function ProfileTab({
               onClick={grantPro}
               disabled={proLoading}
             >
-              {proLoading ? 'Activating…' : 'Activate Pro (temp)'}
+              {proLoading ? 'Updating…' : 'Activate Pro'}
+            </button>
+          )}
+          {isPro && (
+            <button
+              className="profile-cancel-btn"
+              style={{ marginTop: '0.4rem', fontSize: '0.75rem', padding: '0.25rem 0.75rem', opacity: 0.6 }}
+              onClick={grantPro}
+              disabled={proLoading}
+            >
+              {proLoading ? 'Updating…' : 'Deactivate Pro'}
             </button>
           )}
         </div>

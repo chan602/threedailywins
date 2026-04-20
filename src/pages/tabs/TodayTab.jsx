@@ -120,7 +120,7 @@ export default function TodayTab({
                   <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
                     {t.text}
                     {t.carried && (
-                      <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 3 ? ' carried-tag-warn' : ''}`}>
+                      <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-flash' : (t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
                         carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
                       </span>
                     )}
@@ -300,7 +300,7 @@ export default function TodayTab({
                   <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
                     {t.text}
                     {t.carried && (
-                      <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 3 ? ' carried-tag-warn' : ''}`}>
+                      <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-flash' : (t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
                         carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
                       </span>
                     )}
