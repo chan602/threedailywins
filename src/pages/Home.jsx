@@ -137,6 +137,8 @@ function Home({ isGuest = false }) {
   const [announcements, setAnnouncements] = useState([])  // stored in localStorage
   const [showPwaNotif, setShowPwaNotif] = useState(false)
   const [socialNotifs, setSocialNotifs] = useState([])
+  const [challengeError, setChallengeError] = useState('')
+  const [proLoading, setProLoading] = useState(false)
 
 
   // ── FIREBASE REFS ─────────────────────────────────────
@@ -753,6 +755,51 @@ Respond ONLY with valid JSON, no other text:
       best,
       updatedAt: Date.now()
     })
+
+    // ── AUTO MILESTONES ──────────────────────────────────
+    const milestones = [5, 10, 25, 50, 100]
+    const writes = []
+
+    // Total wins milestones — only fire when we just crossed the threshold
+    const prevTotal = existing.total || 0
+    for (const m of milestones) {
+      if (prevTotal < m && total >= m) {
+        writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', `total_${m}`), {
+          type: 'streak_milestone',
+          streakCount: m,
+          label: `${m} total wins`,
+          createdAt: Date.now(),
+          kudosCount: 0,
+        }))
+      }
+    }
+
+    // Current streak milestones — only fire when we just crossed the threshold
+    const prevCurrent = existing.current || 0
+    for (const m of milestones) {
+      if (prevCurrent < m && current >= m) {
+        writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', `streak_${m}`), {
+          type: 'streak_milestone',
+          streakCount: m,
+          label: `${m}-day streak`,
+          createdAt: Date.now(),
+          kudosCount: 0,
+        }))
+      }
+    }
+
+    // First three-win day
+    if (todayIsWin && (existing.total || 0) === 0) {
+      writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', 'first_three_win_day'), {
+        type: 'three_win_day',
+        label: 'First three-win day',
+        date: todayStr(),
+        createdAt: Date.now(),
+        kudosCount: 0,
+      }))
+    }
+
+    if (writes.length > 0) await Promise.all(writes)
     // onSnapshot will update streak state automatically
   }
 
@@ -1065,6 +1112,15 @@ Respond ONLY with valid JSON, no other text:
     }
   }
 
+  async function grantPro() {
+    if (!uid) return
+    setProLoading(true)
+    const updated = { ...userProfile, isPro: true }
+    await setDoc(doc(db, 'users', uid), updated)
+    setUserProfile(updated)
+    setProLoading(false)
+  }
+
   async function handleSendNudge(recipientUid, taskText) {
     if (!uid) return
     await sendNudgeFn({
@@ -1198,11 +1254,17 @@ Respond ONLY with valid JSON, no other text:
   }
 
   async function handleRespondToChallenge(notif, response) {
+    setChallengeError('')
     try {
+      if (!notif.challengeId) {
+        setChallengeError('Challenge ID missing — try dismissing and re-opening the notification.')
+        return
+      }
       await respondToChallengeFn({ challengeId: notif.challengeId, response, notifId: notif.id })
       setSocialNotifs(prev => prev.filter(n => n.id !== notif.id))
     } catch (e) {
       console.error('respondToChallenge error:', e)
+      setChallengeError('Something went wrong — please try again.')
     }
   }
 
@@ -1353,6 +1415,7 @@ Respond ONLY with valid JSON, no other text:
                         <p className="notif-item-msg">{n.message}</p>
                         {n.type === 'challenge' && (
                           <div className="notif-item-actions">
+                            {challengeError && <p className="eval-error" style={{ fontSize: '0.75rem', marginBottom: '0.25rem' }}>{challengeError}</p>}
                             <button className="friends-accept-btn" onClick={() => handleRespondToChallenge(n, 'accepted')}>Accept</button>
                             <button className="friends-decline-btn" onClick={() => handleRespondToChallenge(n, 'declined')}>Decline</button>
                           </div>
@@ -1571,6 +1634,9 @@ Respond ONLY with valid JSON, no other text:
             deleteError={deleteError}
             setDeleteError={setDeleteError}
             deleteAccount={deleteAccount}
+            isPro={userProfile?.isPro || false}
+            grantPro={grantPro}
+            proLoading={proLoading}
           />
         )}
 

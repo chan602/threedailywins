@@ -26,11 +26,6 @@ export default function FriendsTab({
   sendNudge,
   sendChallenge,
 }) {
-  const [nudgeOpen, setNudgeOpen] = useState(null)   // uid of friend with open nudge box
-  const [nudgeText, setNudgeText] = useState('')
-  const [nudgeSending, setNudgeSending] = useState(false)
-  const [nudgeSent, setNudgeSent] = useState({})     // { [uid]: true }
-
   const [challengeOpen, setChallengeOpen] = useState(null)  // uid of friend with open challenge box
   const [challengeText, setChallengeText] = useState('')
   const [challengeDest, setChallengeDest] = useState('today') // 'today' | 'weekly'
@@ -51,21 +46,6 @@ export default function FriendsTab({
       console.error('challenge error:', e)
     }
     setChallengeSending(false)
-  }
-
-  async function handleNudge(friend) {
-    if (!nudgeText.trim() || nudgeSending) return
-    setNudgeSending(true)
-    try {
-      await sendNudge(friend.uid, nudgeText.trim())
-      setNudgeSent(prev => ({ ...prev, [friend.uid]: true }))
-      setNudgeOpen(null)
-      setNudgeText('')
-      setTimeout(() => setNudgeSent(prev => ({ ...prev, [friend.uid]: false })), 3000)
-    } catch (e) {
-      console.error('nudge error:', e)
-    }
-    setNudgeSending(false)
   }
 
   if (isGuest) {
@@ -221,20 +201,6 @@ export default function FriendsTab({
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                {nudgeSent[f.uid] ? (
-                  <span className="friends-status-msg friends-status-green" style={{ fontSize: '0.75rem' }}>Nudged!</span>
-                ) : (
-                  <button
-                    className="friends-view-btn"
-                    onClick={() => {
-                      setNudgeOpen(nudgeOpen === f.uid ? null : f.uid)
-                      setChallengeOpen(null)
-                      setNudgeText('')
-                    }}
-                  >
-                    {nudgeOpen === f.uid ? 'Cancel' : '👋 Nudge'}
-                  </button>
-                )}
                 {challengeSent[f.uid] ? (
                   <span className="friends-status-msg friends-status-green" style={{ fontSize: '0.75rem' }}>Sent!</span>
                 ) : (
@@ -242,7 +208,6 @@ export default function FriendsTab({
                     className="friends-view-btn"
                     onClick={() => {
                       setChallengeOpen(challengeOpen === f.uid ? null : f.uid)
-                      setNudgeOpen(null)
                       setChallengeText('')
                       setChallengeDest('today')
                     }}
@@ -252,26 +217,6 @@ export default function FriendsTab({
                 )}
                 <button className="friends-remove-btn" onClick={() => removeFriend(f.uid)}>Remove</button>
               </div>
-              {nudgeOpen === f.uid && (
-                <div style={{ width: '100%', display: 'flex', gap: '0.4rem', marginTop: '0.25rem' }}>
-                  <input
-                    className="friends-input"
-                    placeholder="Task to nudge them with..."
-                    value={nudgeText}
-                    onChange={e => setNudgeText(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleNudge(f)}
-                    autoFocus
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    className="friends-search-btn"
-                    onClick={() => handleNudge(f)}
-                    disabled={nudgeSending || !nudgeText.trim()}
-                  >
-                    {nudgeSending ? '…' : 'Send'}
-                  </button>
-                </div>
-              )}
               {challengeOpen === f.uid && (
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
                   <input

@@ -631,9 +631,9 @@ body {
   vertical-align: middle;
 }
 
-.carried-tag { background: rgba(251,191,36,0.15); color: rgba(251,191,36,0.7); }
-.carried-tag-warn { background: rgba(251,191,36,0.2); color: rgba(251,191,36,0.9); font-weight: 600; }
-.carried-tag-urgent { background: rgba(239,68,68,0.15); color: rgba(239,68,68,0.8); font-weight: 600; }
+.carried-tag { background: rgba(251,191,36,0.12); color: rgba(251,191,36,0.6); }
+.carried-tag-warn { background: rgba(251,191,36,0.18); color: rgba(251,191,36,0.8); font-weight: 500; }
+.carried-tag-urgent { background: rgba(251,191,36,0.25); color: rgba(251,191,36,1); font-weight: 600; }
 .daily-tag { background: rgba(34,197,94,0.12); color: rgba(34,197,94,0.7); }
 
 /* ── MISC ── */

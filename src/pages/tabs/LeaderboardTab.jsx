@@ -66,10 +66,6 @@ export default function LeaderboardTab({
                     <span className="lb-stat-val">{entry.current ?? 0}</span>
                     <span className="lb-stat-label">streak</span>
                   </div>
-                  <div className="lb-stats">
-                    <span className="lb-stat-val">{entry.total ?? 0}</span>
-                    <span className="lb-stat-label">wins</span>
-                  </div>
                 </div>
               )
             })
@@ -125,12 +121,10 @@ export default function LeaderboardTab({
                         {isMe && <span className="lb-you"> you</span>}
                       </span>
                       <div className="lb-stats">
-                        <span className="lb-stat-val">{entry.current ?? 0}</span>
-                        <span className="lb-stat-label">streak</span>
-                      </div>
-                      <div className="lb-stats">
-                        <span className="lb-stat-val">{entry.total ?? 0}</span>
-                        <span className="lb-stat-label">wins</span>
+                        {lbTab === 'streak'
+                          ? <><span className="lb-stat-val">{entry.current ?? 0}</span><span className="lb-stat-label">streak</span></>
+                          : <><span className="lb-stat-val">{entry.total ?? 0}</span><span className="lb-stat-label">wins</span></>
+                        }
                       </div>
                     </div>
                   )
@@ -155,12 +149,10 @@ export default function LeaderboardTab({
                         <span className="lb-you"> you</span>
                       </span>
                       <div className="lb-stats">
-                        <span className="lb-stat-val">{selfEntry.current ?? 0}</span>
-                        <span className="lb-stat-label">streak</span>
-                      </div>
-                      <div className="lb-stats">
-                        <span className="lb-stat-val">{selfEntry.total ?? 0}</span>
-                        <span className="lb-stat-label">wins</span>
+                        {lbTab === 'streak'
+                          ? <><span className="lb-stat-val">{selfEntry.current ?? 0}</span><span className="lb-stat-label">streak</span></>
+                          : <><span className="lb-stat-val">{selfEntry.total ?? 0}</span><span className="lb-stat-label">wins</span></>
+                        }
                       </div>
                     </div>
                   </>
