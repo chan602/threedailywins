@@ -2,6 +2,8 @@
 // Extracted from Home.jsx. Covers Today, Tomorrow, Weekly,
 // and Daily Habits sub-tabs. All state and logic in Home.
 
+import { useState, useRef } from 'react'
+
 function weekRangeLabel() {
   const d = new Date()
   const day = d.getDay()
@@ -10,6 +12,130 @@ function weekRangeLabel() {
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
   const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   return `${fmt(mon)} – ${fmt(sun)}`
+}
+
+// ── DRAGGABLE TASK LIST ───────────────────────────────────
+function DraggableTaskList({
+  tasks, listType,
+  editingTaskId, editingTaskText, setEditingTaskId, setEditingTaskText, saveTaskEdit,
+  toggleTask, deleteTask, reorderTask, completeChallenge,
+}) {
+  const [dragOverId, setDragOverId] = useState(null)
+  const dragId = useRef(null)
+
+  const seeded = tasks.map((t, i) => t.order != null ? t : { ...t, order: i })
+  const sorted = [...seeded].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+
+  let rankCounter = 0
+
+  function handleDragStart(e, t) {
+    dragId.current = t.id
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e, t) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (t.id !== dragId.current) setDragOverId(t.id)
+  }
+
+  function handleDrop(e, targetTask) {
+    e.preventDefault()
+    setDragOverId(null)
+    const fromId = dragId.current
+    dragId.current = null
+    if (!fromId || fromId === targetTask.id) return
+
+    const fromIdx = sorted.findIndex(t => t.id === fromId)
+    const toIdx   = sorted.findIndex(t => t.id === targetTask.id)
+    if (fromIdx === -1 || toIdx === -1) return
+
+    const reordered = [...sorted]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    const withNewOrder = reordered.map((t, i) => ({ ...t, order: i }))
+
+    reorderTask(listType, withNewOrder)
+  }
+
+  function handleDragEnd() {
+    dragId.current = null
+    setDragOverId(null)
+  }
+
+  if (tasks.length === 0) {
+    return <div className="task-list"><p className="empty-msg">No tasks yet</p></div>
+  }
+
+  return (
+    <div className="task-list">
+      {sorted.map((t, visualIdx) => {
+        const rank = !t.done ? ++rankCounter : null
+        const rankClass = rank === 1 ? 'task-rank-1' : rank === 2 ? 'task-rank-2' : rank === 3 ? 'task-rank-3' : ''
+        const isDragOver = dragOverId === t.id
+
+        return (
+          <div
+            key={t.id}
+            className={`task-item ${t.done ? 'done' : ''} ${isDragOver ? 'drag-over' : ''}`}
+            draggable
+            onDragStart={e => handleDragStart(e, t)}
+            onDragOver={e => handleDragOver(e, t)}
+            onDrop={e => handleDrop(e, t)}
+            onDragEnd={handleDragEnd}
+          >
+            <span className="drag-handle" title="Drag to reorder">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+                <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+              </svg>
+            </span>
+
+            <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => {
+              toggleTask(listType, t.id)
+              if (!t.done && t.tag === 'challenge' && t.challengeId && completeChallenge) {
+                completeChallenge(t.challengeId, t.text)
+              }
+            }} />
+
+            <span className={`task-num ${rankClass}`}>T{visualIdx + 1}</span>
+
+            {editingTaskId === t.id ? (
+              <input
+                className="task-input task-edit-input"
+                value={editingTaskText}
+                onChange={e => setEditingTaskText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveTaskEdit(listType, t.id)
+                  if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') }
+                }}
+                onBlur={() => saveTaskEdit(listType, t.id)}
+                autoFocus
+              />
+            ) : (
+              <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
+                {t.text}
+                {t.carried && (
+                  <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-flash' : (t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
+                    carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
+                  </span>
+                )}
+                {t.fromDTask && <span className="tag daily-tag">daily</span>}
+                {t.tag === 'challenge' && (
+                  <span className="tag" style={{ background: 'var(--accent-muted)', color: 'var(--accent)', marginLeft: 4 }}>
+                    ⚡ {t.challengerName ? `from @${t.challengerName}` : 'challenge'}
+                  </span>
+                )}
+              </span>
+            )}
+
+            <button className="delete-btn" onClick={() => deleteTask(listType, t.id)}>×</button>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export default function TodayTab({
@@ -60,6 +186,7 @@ export default function TodayTab({
   untapDailyRepeat,
   deleteDailyRepeat,
   completeChallenge,
+  reorderTask,
 }) {
   const doneTasks = todayTasks.filter(t => t.done).length
   const totalTasks = todayTasks.length
@@ -93,49 +220,19 @@ export default function TodayTab({
             <button className={`add-btn${addFlash ? ' add-btn-flash' : ''}`} onClick={addTask}>+</button>
           </div>
 
-          <div className="task-list">
-            {todayTasks.length === 0 && <p className="empty-msg">No tasks yet</p>}
-            {[...todayTasks].sort((a, b) => a.done === b.done ? 0 : a.done ? 1 : -1).map((t, i) => (
-              <div key={t.id} className={`task-item ${t.done ? 'done' : ''}`}>
-                <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => {
-                  toggleTask('today', t.id)
-                  if (!t.done && t.tag === 'challenge' && t.challengeId && completeChallenge) {
-                    completeChallenge(t.challengeId, t.text)
-                  }
-                }} />
-                <span className="task-num">T{i + 1}</span>
-                {editingTaskId === t.id ? (
-                  <input
-                    className="task-input task-edit-input"
-                    value={editingTaskText}
-                    onChange={e => setEditingTaskText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') saveTaskEdit('today', t.id)
-                      if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') }
-                    }}
-                    onBlur={() => saveTaskEdit('today', t.id)}
-                    autoFocus
-                  />
-                ) : (
-                  <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
-                    {t.text}
-                    {t.carried && (
-                      <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-flash' : (t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
-                        carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
-                      </span>
-                    )}
-                    {t.fromDTask && <span className="tag daily-tag">daily</span>}
-                    {t.tag === 'challenge' && (
-                      <span className="tag" style={{ background: 'var(--accent-muted)', color: 'var(--accent)', marginLeft: 4 }}>
-                        ⚡ {t.challengerName ? `from @${t.challengerName}` : 'challenge'}
-                      </span>
-                    )}
-                  </span>
-                )}
-                <button className="delete-btn" onClick={() => deleteTask('today', t.id)}>×</button>
-              </div>
-            ))}
-          </div>
+          <DraggableTaskList
+            tasks={todayTasks}
+            listType="today"
+            editingTaskId={editingTaskId}
+            editingTaskText={editingTaskText}
+            setEditingTaskId={setEditingTaskId}
+            setEditingTaskText={setEditingTaskText}
+            saveTaskEdit={saveTaskEdit}
+            toggleTask={toggleTask}
+            deleteTask={deleteTask}
+            reorderTask={reorderTask}
+            completeChallenge={completeChallenge}
+          />
 
           {/* ── AI WINS EVAL PANEL ── */}
           <div className={`wins-panel${tutorialStep === 4 ? ' tutorial-highlight' : ''}`}>

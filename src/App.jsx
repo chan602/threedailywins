@@ -16,12 +16,14 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/home" element={
+        <Route path="/home/:nav" element={
           <ProtectedRoute>
             <Home />
           </ProtectedRoute>
         } />
-        <Route path="/guest" element={<Home isGuest={true} />} />
+        <Route path="/home" element={<Navigate to="/home/today" replace />} />
+        <Route path="/guest/:nav" element={<Home isGuest={true} />} />
+        <Route path="/guest" element={<Navigate to="/guest/today" replace />} />
         <Route path="/u/:username" element={<UserProfile />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>

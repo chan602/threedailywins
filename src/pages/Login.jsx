@@ -43,7 +43,7 @@ function Login() {
           <img src="/icons/icon-192.png" alt="3W" className="login-icon" />
           <h1 className="login-title">threedailywins</h1>
           <p className="login-tagline">
-            A structured framework for daily well-being — one physical, one mental, one spiritual win.
+            Most people end the day feeling behind. Three Daily Wins helps you close it feeling like you showed up.
           </p>
         </div>
 
@@ -100,7 +100,7 @@ function Login() {
             based on definitions personal to you.
           </p>
           <a
-            href="https://chan602.com/devblog.html"
+            href="https://chan602.com/threewins.html"
             target="_blank"
             rel="noopener noreferrer"
             className="login-learn-more"

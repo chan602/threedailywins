@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { todayStr, tomorrowStr, weekKey, getWeekKeyForDate, isThreeWinDay, getEffectiveWin } from './tabs/utils'
 import ArchiveTab from './tabs/ArchiveTab'
 import LeaderboardTab from './tabs/LeaderboardTab'
@@ -32,7 +32,7 @@ function Home({ isGuest = false }) {
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState('today')
-  const [activeNav, setActiveNav] = useState('home')
+  const { nav: activeNav = 'home' } = useParams()
   const [todayTasks, setTodayTasks] = useState([])
   const [tomorrowTasks, setTomorrowTasks] = useState([])
   const [weeklyTasks, setWeeklyTasks] = useState([])
@@ -509,6 +509,16 @@ function Home({ isGuest = false }) {
     }
     setAddFlash(true)
     setTimeout(() => setAddFlash(false), 400)
+  }
+
+  async function reorderTask(type, reorderedTasks) {
+    if (type === 'today') {
+      if (isGuest) { setTodayTasks(reorderedTasks); return }
+      await setDoc(todayRef, { tasks: reorderedTasks, date: todayStr() })
+    } else if (type === 'weekly') {
+      if (isGuest) { setWeeklyTasks(reorderedTasks); return }
+      await setDoc(weekRef, { tasks: reorderedTasks, weekKey: weekKey() })
+    }
   }
 
   async function addDailyRepeat() {
@@ -1491,7 +1501,7 @@ Respond ONLY with valid JSON, no other text:
 
 
       {/* SUB-TABS — only shown on Home nav */}
-      {activeNav === 'home' && (
+      {activeNav === 'today' && (
         <div className="tab-bar">
           {['today', 'tomorrow', 'weekly'].map(tab => (
             <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
@@ -1505,7 +1515,7 @@ Respond ONLY with valid JSON, no other text:
       <div className="tab-content">
 
         {/* ── HOME TABS ── */}
-        {activeNav === 'home' && (
+        {activeNav === 'today' && (
           <TodayTab
             activeTab={activeTab}
             todayTasks={todayTasks}
@@ -1549,6 +1559,7 @@ Respond ONLY with valid JSON, no other text:
             untapDailyRepeat={untapDailyRepeat}
             deleteDailyRepeat={deleteDailyRepeat}
             completeChallenge={handleCompleteChallenge}
+            reorderTask={reorderTask}
           />
         )}
 
@@ -1678,8 +1689,8 @@ Respond ONLY with valid JSON, no other text:
       {/* ── BOTTOM NAV ── */}
       <nav className={`bottom-nav${tutorialStep === 2 ? ' tutorial-highlight' : ''}`}>
         <button
-          className={`bottom-nav-item ${activeNav === 'home' ? 'active' : ''}`}
-          onClick={() => setActiveNav('home')}
+          className={`bottom-nav-item ${activeNav === 'today' ? 'active' : ''}`}
+          onClick={() => navigate('/home/today')}
         >
           <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
@@ -1690,7 +1701,7 @@ Respond ONLY with valid JSON, no other text:
 
         <button
           className={`bottom-nav-item ${activeNav === 'archive' ? 'active' : ''}`}
-          onClick={() => setActiveNav('archive')}
+          onClick={() => navigate('/home/archive')}
         >
           <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="3" width="20" height="5" rx="1"/>
@@ -1702,7 +1713,7 @@ Respond ONLY with valid JSON, no other text:
 
         <button
           className={`bottom-nav-item ${activeNav === 'friends' ? 'active' : ''}`}
-          onClick={() => setActiveNav('friends')}
+          onClick={() => navigate('/home/friends')}
         >
           <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="9" cy="7" r="4"/>
@@ -1715,7 +1726,7 @@ Respond ONLY with valid JSON, no other text:
 
         <button
           className={`bottom-nav-item ${activeNav === 'leaderboard' ? 'active' : ''}`}
-          onClick={() => setActiveNav('leaderboard')}
+          onClick={() => navigate('/home/leaderboard')}
         >
           <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="18" y="3" width="4" height="18" rx="1"/>
@@ -1727,7 +1738,7 @@ Respond ONLY with valid JSON, no other text:
 
         <button
           className={`bottom-nav-item ${activeNav === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveNav('profile')}
+          onClick={() => navigate('/home/profile')}
         >
           <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="8" r="4"/>
