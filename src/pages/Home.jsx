@@ -126,7 +126,11 @@ function Home({ isGuest = false }) {
   // Visibility settings state
   const [visTodo, setVisTodo] = useState('friends')
   const [visStats, setVisStats] = useState('public')
+  const [visArchive, setVisArchive] = useState('friends')
   const [visSaved, setVisSaved] = useState(false)
+
+  // Customization state
+  const [autoSortCompleted, setAutoSortCompleted] = useState(false)
 
   // Theme state
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark')
@@ -188,6 +192,8 @@ function Home({ isGuest = false }) {
         setEvalMode(data.evalMode || 'broad')
         setVisTodo(data.visibility?.todo || 'friends')
         setVisStats(data.visibility?.stats || 'public')
+        setVisArchive(data.visibility?.archive || 'friends')
+        setAutoSortCompleted(data.autoSortCompleted || false)
         setEditBio(data.bio || '')
         if (!data.hasSeenTutorial) setTutorialStep(1)
       }
@@ -834,20 +840,27 @@ Respond ONLY with valid JSON, no other text:
     setTimeout(() => setDefsSaved(false), 2500)
   }
 
-  async function saveVisibility(todoVal, statsVal) {
+  async function saveVisibility(todoVal, statsVal, archiveVal) {
     if (!uid) return
     const updated = {
       ...userProfile,
       visibility: {
         todo: todoVal,
-        archive: todoVal,   // archive follows todo for now
         stats: statsVal,
+        archive: archiveVal ?? visArchive,
       }
     }
     await setDoc(doc(db, 'users', uid), updated)
     setUserProfile(updated)
     setVisSaved(true)
     setTimeout(() => setVisSaved(false), 2500)
+  }
+
+  async function saveAutoSort(val) {
+    if (!uid) return
+    const updated = { ...userProfile, autoSortCompleted: val }
+    await setDoc(doc(db, 'users', uid), updated)
+    setUserProfile(updated)
   }
 
   async function saveBio() {
@@ -1630,9 +1643,14 @@ Respond ONLY with valid JSON, no other text:
             setVisTodo={setVisTodo}
             visStats={visStats}
             setVisStats={setVisStats}
+            visArchive={visArchive}
+            setVisArchive={setVisArchive}
             visSaved={visSaved}
             setVisSaved={setVisSaved}
             saveVisibility={saveVisibility}
+            autoSortCompleted={autoSortCompleted}
+            setAutoSortCompleted={setAutoSortCompleted}
+            saveAutoSort={saveAutoSort}
             theme={theme}
             setTheme={setTheme}
             dataActionSuccess={dataActionSuccess}
