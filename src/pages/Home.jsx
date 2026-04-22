@@ -521,10 +521,14 @@ function Home({ isGuest = false }) {
     if (!uid) return
     try {
       const snap = await getDocs(collection(db, 'futureTasks', uid, 'days'))
+      const today = todayStr()
+      const tomorrow = tomorrowStr()
       const map = {}
-      snap.docs.forEach(d => { map[d.id] = d.data().tasks || [] })
+      // today/tomorrow are owned by their respective task queues — exclude them here
+      snap.docs.forEach(d => {
+        if (d.id !== today && d.id !== tomorrow) map[d.id] = d.data().tasks || []
+      })
       setFutureTasks(map)
-      migrateFutureTasks(map)
     } catch (e) {
       console.error('loadFutureTasks error:', e)
     }
@@ -550,11 +554,9 @@ function Home({ isGuest = false }) {
           if (date === today) setTodayTasks(merged)
           else setTomorrowTasks(merged)
         }
-        // Only remove from calendar once it's today — tomorrow tasks stay visible on calendar
-        if (date === today) {
-          await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
-          setFutureTasks(prev => { const n = { ...prev }; delete n[date]; return n })
-        }
+        // Clean up futureTasks doc — tomorrow queue is now the single source of truth for both dates
+        await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
+        setFutureTasks(prev => { const n = { ...prev }; delete n[date]; return n })
       } catch (e) {
         console.error('migrateFutureTasks error:', e)
       }
@@ -563,6 +565,14 @@ function Home({ isGuest = false }) {
 
   async function addFutureTask(date, text) {
     if (!uid || !text.trim()) return
+    // Tomorrow is owned by the tomorrow queue — route there directly
+    if (date === tomorrowStr()) {
+      const task = { id: uuidv4(), text: text.trim(), done: false, carried: false, carryCount: 0, createdAt: Date.now() }
+      const updated = [...tomorrowTasks, task]
+      setTomorrowTasks(updated)
+      await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
+      return
+    }
     const existing = futureTasks[date] || []
     const newTask = { id: uuidv4(), text: text.trim(), done: false, order: existing.length }
     const updated = [...existing, newTask]
@@ -572,6 +582,13 @@ function Home({ isGuest = false }) {
 
   async function deleteFutureTask(date, taskId) {
     if (!uid) return
+    // Tomorrow is owned by the tomorrow queue — route there directly
+    if (date === tomorrowStr()) {
+      const updated = tomorrowTasks.filter(t => t.id !== taskId)
+      setTomorrowTasks(updated)
+      await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
+      return
+    }
     const existing = futureTasks[date] || []
     const updated = existing.filter(t => t.id !== taskId)
     setFutureTasks(prev => ({ ...prev, [date]: updated }))
@@ -579,14 +596,6 @@ function Home({ isGuest = false }) {
       await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
     } else {
       await setDoc(doc(db, 'futureTasks', uid, 'days', date), { date, tasks: updated })
-    }
-    // If deleting tomorrow's calendar task, also remove from tomorrow queue (it may have already arrived)
-    if (date === tomorrowStr()) {
-      const tmrwUpdated = tomorrowTasks.filter(t => t.id !== taskId)
-      if (tmrwUpdated.length !== tomorrowTasks.length) {
-        setTomorrowTasks(tmrwUpdated)
-        await setDoc(tmrwRef, { tasks: tmrwUpdated, date: tomorrowStr() })
-      }
     }
   }
 
@@ -655,22 +664,10 @@ function Home({ isGuest = false }) {
       if (isGuest) { setTodayTasks(updated); return }
       await setDoc(todayRef, { tasks: updated, date: todayStr() })
     } else if (type === 'tomorrow') {
-      const task = tomorrowTasks.find(t => t.id === id)
       const updated = tomorrowTasks.filter(t => t.id !== id)
       if (isGuest) { setTomorrowTasks(updated); return }
-      await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
       setTomorrowTasks(updated)
-      // If this task came from futureTasks, remove it there too so it doesn't re-appear on reload
-      if (task?.fromFuture) {
-        const tmrw = tomorrowStr()
-        const ftUpdated = (futureTasks[tmrw] || []).filter(t => t.id !== id)
-        setFutureTasks(prev => ({ ...prev, [tmrw]: ftUpdated }))
-        if (ftUpdated.length === 0) {
-          await deleteDoc(doc(db, 'futureTasks', uid, 'days', tmrw))
-        } else {
-          await setDoc(doc(db, 'futureTasks', uid, 'days', tmrw), { date: tmrw, tasks: ftUpdated })
-        }
-      }
+      await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
     } else if (type === 'weekly') {
       const updated = weeklyTasks.filter(t => t.id !== id)
       if (isGuest) { setWeeklyTasks(updated); return }
@@ -1809,6 +1806,7 @@ Respond ONLY with valid JSON, no other text:
             futureTasks={futureTasks}
             addFutureTask={addFutureTask}
             deleteFutureTask={deleteFutureTask}
+            tomorrowTasks={tomorrowTasks}
           />
         )}
 

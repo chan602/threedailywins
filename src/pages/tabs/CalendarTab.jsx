@@ -4,7 +4,7 @@
 // Auto-arrive migration handled in Home.jsx on load.
 
 import { useState } from 'react'
-import { todayStr, isThreeWinDay } from './utils'
+import { todayStr, tomorrowStr, isThreeWinDay } from './utils'
 
 const MONTHS = ['January','February','March','April','May','June',
   'July','August','September','October','November','December']
@@ -184,6 +184,7 @@ export default function CalendarTab({
   setArchiveAddInput, setEditingArchiveDay,
   updateArchiveTask, deleteArchiveTask, addArchiveTask, evaluateArchiveDay,
   futureTasks, addFutureTask, deleteFutureTask,
+  tomorrowTasks,
 }) {
   const today = todayStr()
   const now = new Date()
@@ -227,9 +228,13 @@ export default function CalendarTab({
     )
   }
 
+  const tomorrow = tomorrowStr()
   const selArchiveDay  = selectedDate ? archiveDayMap[selectedDate] : null
   const selWinsDoc     = selectedDate ? (winsCache[selectedDate] || null) : null
-  const selFutureTasks = selectedDate ? (futureTasks[selectedDate] || []) : []
+  // Tomorrow is owned by the tomorrow queue; futureTasks only covers dates beyond tomorrow
+  const selFutureTasks = selectedDate
+    ? (selectedDate === tomorrow ? (tomorrowTasks || []) : (futureTasks[selectedDate] || []))
+    : []
   const isPast    = selectedDate && selectedDate < today
   const isToday   = selectedDate === today
   const isFuture  = selectedDate && selectedDate > today
@@ -272,7 +277,9 @@ export default function CalendarTab({
           const archiveDay   = archiveDayMap[date]
           const winsDoc      = winsCache[date] || null
           const threeWin      = cellIsPast && isThreeWinDay(winsDoc)
-          const futureDayTasks = cellIsFuture ? (futureTasks[date] || []) : []
+          const futureDayTasks = cellIsFuture
+            ? (date === tomorrow ? (tomorrowTasks || []) : (futureTasks[date] || []))
+            : []
           const dayTasks      = archiveDay?.tasks || []
 
           return (
