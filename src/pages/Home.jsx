@@ -1573,6 +1573,7 @@ Respond ONLY with valid JSON, no other text:
             deleteDailyRepeat={deleteDailyRepeat}
             completeChallenge={handleCompleteChallenge}
             reorderTask={reorderTask}
+            autoSortCompleted={autoSortCompleted}
           />
         )}
 

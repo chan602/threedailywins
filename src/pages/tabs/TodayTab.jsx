@@ -19,12 +19,16 @@ function DraggableTaskList({
   tasks, listType,
   editingTaskId, editingTaskText, setEditingTaskId, setEditingTaskText, saveTaskEdit,
   toggleTask, deleteTask, reorderTask, completeChallenge,
+  autoSortCompleted,
 }) {
   const [dragOverId, setDragOverId] = useState(null)
   const dragId = useRef(null)
 
   const seeded = tasks.map((t, i) => t.order != null ? t : { ...t, order: i })
-  const sorted = [...seeded].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  const byOrder = [...seeded].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  const sorted = autoSortCompleted
+    ? [...byOrder.filter(t => !t.done), ...byOrder.filter(t => t.done)]
+    : byOrder
 
   let rankCounter = 0
 
@@ -187,6 +191,7 @@ export default function TodayTab({
   deleteDailyRepeat,
   completeChallenge,
   reorderTask,
+  autoSortCompleted,
 }) {
   const doneTasks = todayTasks.filter(t => t.done).length
   const totalTasks = todayTasks.length
@@ -232,6 +237,7 @@ export default function TodayTab({
             deleteTask={deleteTask}
             reorderTask={reorderTask}
             completeChallenge={completeChallenge}
+            autoSortCompleted={autoSortCompleted}
           />
 
           {/* ── AI WINS EVAL PANEL ── */}
