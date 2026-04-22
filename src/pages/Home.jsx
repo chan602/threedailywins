@@ -580,6 +580,14 @@ function Home({ isGuest = false }) {
     } else {
       await setDoc(doc(db, 'futureTasks', uid, 'days', date), { date, tasks: updated })
     }
+    // If deleting tomorrow's calendar task, also remove from tomorrow queue (it may have already arrived)
+    if (date === tomorrowStr()) {
+      const tmrwUpdated = tomorrowTasks.filter(t => t.id !== taskId)
+      if (tmrwUpdated.length !== tomorrowTasks.length) {
+        setTomorrowTasks(tmrwUpdated)
+        await setDoc(tmrwRef, { tasks: tmrwUpdated, date: tomorrowStr() })
+      }
+    }
   }
 
   // ── TASK OPERATIONS ───────────────────────────────────
@@ -647,9 +655,22 @@ function Home({ isGuest = false }) {
       if (isGuest) { setTodayTasks(updated); return }
       await setDoc(todayRef, { tasks: updated, date: todayStr() })
     } else if (type === 'tomorrow') {
+      const task = tomorrowTasks.find(t => t.id === id)
       const updated = tomorrowTasks.filter(t => t.id !== id)
       if (isGuest) { setTomorrowTasks(updated); return }
       await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
+      setTomorrowTasks(updated)
+      // If this task came from futureTasks, remove it there too so it doesn't re-appear on reload
+      if (task?.fromFuture) {
+        const tmrw = tomorrowStr()
+        const ftUpdated = (futureTasks[tmrw] || []).filter(t => t.id !== id)
+        setFutureTasks(prev => ({ ...prev, [tmrw]: ftUpdated }))
+        if (ftUpdated.length === 0) {
+          await deleteDoc(doc(db, 'futureTasks', uid, 'days', tmrw))
+        } else {
+          await setDoc(doc(db, 'futureTasks', uid, 'days', tmrw), { date: tmrw, tasks: ftUpdated })
+        }
+      }
     } else if (type === 'weekly') {
       const updated = weeklyTasks.filter(t => t.id !== id)
       if (isGuest) { setWeeklyTasks(updated); return }

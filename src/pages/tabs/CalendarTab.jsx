@@ -271,9 +271,9 @@ export default function CalendarTab({
           const isSelected   = date === selectedDate
           const archiveDay   = archiveDayMap[date]
           const winsDoc      = winsCache[date] || null
-          const threeWin     = cellIsPast && isThreeWinDay(winsDoc)
-          const hasFuture    = cellIsFuture && (futureTasks[date]?.length > 0)
-          const dayTasks     = archiveDay?.tasks || []
+          const threeWin      = cellIsPast && isThreeWinDay(winsDoc)
+          const futureDayTasks = cellIsFuture ? (futureTasks[date] || []) : []
+          const dayTasks      = archiveDay?.tasks || []
 
           return (
             <div
@@ -292,7 +292,9 @@ export default function CalendarTab({
               {cellIsPast && dayTasks.length > 0 && (
                 <MiniBar tasks={dayTasks} winsDoc={winsDoc} />
               )}
-              {hasFuture && <span className="cal-future-dot" />}
+              {futureDayTasks.length > 0 && (
+                <span className="cal-future-count">{futureDayTasks.length}</span>
+              )}
             </div>
           )
         })}

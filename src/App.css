@@ -2876,7 +2876,7 @@ body {
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 1px;
   margin-bottom: 1rem;
 }
 
@@ -2898,12 +2898,13 @@ body {
   justify-content: flex-start;
   padding-top: 5px;
   border-radius: 6px;
+  border: 1px solid var(--border);
   cursor: pointer;
   overflow: hidden;
   transition: background 0.15s;
 }
 .cal-cell:hover { background: var(--bg-card-hover); }
-.cal-cell-empty { cursor: default; pointer-events: none; }
+.cal-cell-empty { cursor: default; pointer-events: none; border: none; }
 
 .cal-day-num {
   font-size: 0.78rem;
@@ -2930,7 +2931,7 @@ body {
 /* Selected: filled accent */
 .cal-selected {
   background: var(--accent) !important;
-  border-color: var(--accent);
+  border-color: var(--accent) !important;
 }
 .cal-selected .cal-day-num { color: #fff !important; font-weight: 600; }
 .cal-selected:hover { background: var(--accent) !important; }
@@ -2941,16 +2942,13 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 5px;
   display: flex;
   overflow: hidden;
 }
 
-/* 3W badge — gradient text, top-right of cell */
+/* 3W badge — gradient text, in-flow below day number */
 .cal-3w-badge {
-  position: absolute;
-  top: 2px;
-  right: 3px;
   font-size: 0.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -2960,16 +2958,20 @@ body {
   background-clip: text;
   line-height: 1;
   pointer-events: none;
+  margin-top: 2px;
 }
 
-/* Future task dot — accent pip */
-.cal-future-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-  margin-top: 2px;
-  flex-shrink: 0;
+/* Future task count badge */
+.cal-future-count {
+  margin-top: 3px;
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--accent);
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 10px;
+  pointer-events: none;
 }
 
 /* ── CALENDAR DAY PANEL (below grid) ── */
