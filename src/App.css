@@ -2946,15 +2946,20 @@ body {
   overflow: hidden;
 }
 
-/* 3W dot — green pip above day number */
-.cal-3w-dot {
+/* 3W badge — gradient text, top-right of cell */
+.cal-3w-badge {
   position: absolute;
-  top: 3px;
-  right: 4px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #22c55e;
+  top: 2px;
+  right: 3px;
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #c084fc, #fb923c, #4ade80);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  pointer-events: none;
 }
 
 /* Future task dot — accent pip */

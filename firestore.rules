@@ -91,5 +91,10 @@ service cloud.firestore {
       allow read: if isOwner(uid) || canSeeSection(uid, 'stats');
       allow write: if isOwner(uid);
     }
+
+    // Future tasks (calendar planning) — owner only
+    match /futureTasks/{uid}/{rest=**} {
+      allow read, write: if isOwner(uid);
+    }
   }
 }

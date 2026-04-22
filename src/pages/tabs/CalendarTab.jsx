@@ -153,9 +153,8 @@ function FutureDayPanel({ date, tasks, addFutureTask, deleteFutureTask }) {
           <p className="empty-msg" style={{ marginBottom: '0.5rem' }}>No tasks planned for this day.</p>
         )}
         {tasks.map((t, i) => (
-          <div key={t.id || i} className="archive-task">
-            <span className="archive-task-dot" style={{ background: 'var(--text-faint)' }} />
-            <span className="archive-task-text">{t.text}</span>
+          <div key={t.id || i} className="task-item" style={{ padding: '0.4rem 0' }}>
+            <span className="task-text" style={{ flex: 1, fontSize: '0.88rem' }}>{t.text}</span>
             <button className="delete-btn" onClick={() => deleteFutureTask(date, t.id)}>×</button>
           </div>
         ))}
@@ -289,7 +288,7 @@ export default function CalendarTab({
               onClick={() => setSelectedDate(isSelected ? null : date)}
             >
               <span className="cal-day-num">{dayNum}</span>
-              {threeWin && <span className="cal-3w-dot" />}
+              {threeWin && <span className="cal-3w-badge">3W</span>}
               {cellIsPast && dayTasks.length > 0 && (
                 <MiniBar tasks={dayTasks} winsDoc={winsDoc} />
               )}

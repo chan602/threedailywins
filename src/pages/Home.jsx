@@ -455,6 +455,25 @@ function Home({ isGuest = false }) {
     }
   }, [activeNav, uid])
 
+  // ── MIGRATE TODAY/TOMORROW FUTURE TASKS ON STARTUP ───
+  // Runs once when uid is available — doesn't require calendar tab to be open
+  useEffect(() => {
+    if (!uid || isGuest) return
+    async function runStartupMigration() {
+      const today = todayStr()
+      const tomorrow = tomorrowStr()
+      const map = {}
+      for (const date of [today, tomorrow]) {
+        try {
+          const snap = await getDoc(doc(db, 'futureTasks', uid, 'days', date))
+          if (snap.exists()) map[date] = snap.data().tasks || []
+        } catch (e) { /* ignore */ }
+      }
+      if (Object.keys(map).length > 0) migrateFutureTasks(map)
+    }
+    runStartupMigration()
+  }, [uid])
+
   // ── LOAD LEADERBOARD (on mount + when tab switches) ──
   useEffect(() => {
     loadLeaderboard()
@@ -531,8 +550,11 @@ function Home({ isGuest = false }) {
           if (date === today) setTodayTasks(merged)
           else setTomorrowTasks(merged)
         }
-        await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
-        setFutureTasks(prev => { const n = { ...prev }; delete n[date]; return n })
+        // Only remove from calendar once it's today — tomorrow tasks stay visible on calendar
+        if (date === today) {
+          await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
+          setFutureTasks(prev => { const n = { ...prev }; delete n[date]; return n })
+        }
       } catch (e) {
         console.error('migrateFutureTasks error:', e)
       }
