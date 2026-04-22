@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { todayStr, tomorrowStr, weekKey, getWeekKeyForDate, isThreeWinDay, getEffectiveWin } from './tabs/utils'
 import ArchiveTab from './tabs/ArchiveTab'
+import CalendarTab from './tabs/CalendarTab'
 import LeaderboardTab from './tabs/LeaderboardTab'
 import FriendsTab from './tabs/FriendsTab'
 import ProfileTab from './tabs/ProfileTab'
@@ -63,6 +64,9 @@ function Home({ isGuest = false }) {
   const [archiveLoading, setArchiveLoading] = useState(false)
   const [expandedDays, setExpandedDays] = useState({})
   const [expandedWeeks, setExpandedWeeks] = useState({})
+
+  // Future tasks state (calendar)
+  const [futureTasks, setFutureTasks] = useState({})   // { [date]: [tasks] }
 
   // User profile (for win definitions)
   const [userProfile, setUserProfile] = useState(null)
@@ -443,10 +447,11 @@ function Home({ isGuest = false }) {
     return () => unsub()
   }, [uid])
 
-  // ── LOAD ARCHIVE (when tab switches to archive) ───────
+  // ── LOAD ARCHIVE + FUTURE TASKS (when calendar tab opens) ──
   useEffect(() => {
-    if (activeNav === 'archive' && uid) {
+    if (activeNav === 'calendar' && uid) {
       loadArchive()
+      loadFutureTasks()
     }
   }, [activeNav, uid])
 
@@ -490,6 +495,69 @@ function Home({ isGuest = false }) {
       console.error('loadArchive error:', e)
     }
     setArchiveLoading(false)
+  }
+
+  // ── FUTURE TASKS (calendar) ───────────────────────────
+  async function loadFutureTasks() {
+    if (!uid) return
+    try {
+      const snap = await getDocs(collection(db, 'futureTasks', uid, 'days'))
+      const map = {}
+      snap.docs.forEach(d => { map[d.id] = d.data().tasks || [] })
+      setFutureTasks(map)
+      migrateFutureTasks(map)
+    } catch (e) {
+      console.error('loadFutureTasks error:', e)
+    }
+  }
+
+  async function migrateFutureTasks(map) {
+    const today = todayStr()
+    const tomorrow = tomorrowStr()
+    for (const date of [today, tomorrow]) {
+      const tasks = map[date]
+      if (!tasks?.length) continue
+      const targetCol = date === today ? 'today' : 'tomorrow'
+      try {
+        const snap = await getDoc(doc(db, 'tasks', uid, targetCol, 'data'))
+        const current = snap.exists() ? (snap.data().tasks || []) : []
+        const existingTexts = new Set(current.map(t => t.text))
+        const toAdd = tasks
+          .filter(t => !existingTexts.has(t.text))
+          .map((t, i) => ({ ...t, fromFuture: true, order: current.length + i }))
+        if (toAdd.length > 0) {
+          const merged = [...current, ...toAdd]
+          await setDoc(doc(db, 'tasks', uid, targetCol, 'data'), { tasks: merged })
+          if (date === today) setTodayTasks(merged)
+          else setTomorrowTasks(merged)
+        }
+        await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
+        setFutureTasks(prev => { const n = { ...prev }; delete n[date]; return n })
+      } catch (e) {
+        console.error('migrateFutureTasks error:', e)
+      }
+    }
+  }
+
+  async function addFutureTask(date, text) {
+    if (!uid || !text.trim()) return
+    const existing = futureTasks[date] || []
+    const newTask = { id: uuidv4(), text: text.trim(), done: false, order: existing.length }
+    const updated = [...existing, newTask]
+    setFutureTasks(prev => ({ ...prev, [date]: updated }))
+    await setDoc(doc(db, 'futureTasks', uid, 'days', date), { date, tasks: updated })
+  }
+
+  async function deleteFutureTask(date, taskId) {
+    if (!uid) return
+    const existing = futureTasks[date] || []
+    const updated = existing.filter(t => t.id !== taskId)
+    setFutureTasks(prev => ({ ...prev, [date]: updated }))
+    if (updated.length === 0) {
+      await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
+    } else {
+      await setDoc(doc(db, 'futureTasks', uid, 'days', date), { date, tasks: updated })
+    }
   }
 
   // ── TASK OPERATIONS ───────────────────────────────────
@@ -1678,28 +1746,26 @@ Respond ONLY with valid JSON, no other text:
           />
         )}
 
-        {/* ── ARCHIVE ── */}
-        {activeNav === 'archive' && (
-          <ArchiveTab
+        {/* ── CALENDAR ── */}
+        {activeNav === 'calendar' && (
+          <CalendarTab
             isGuest={isGuest}
             navigate={navigate}
             archiveLoading={archiveLoading}
             archiveDays={archiveDays}
-            archiveWeeks={archiveWeeks}
             winsCache={winsCache}
-            expandedDays={expandedDays}
-            expandedWeeks={expandedWeeks}
             editingArchiveDay={editingArchiveDay}
             archiveAddInput={archiveAddInput}
             archiveEvalLoading={archiveEvalLoading}
             setArchiveAddInput={setArchiveAddInput}
             setEditingArchiveDay={setEditingArchiveDay}
-            toggleDay={toggleDay}
-            toggleWeek={toggleWeek}
             updateArchiveTask={updateArchiveTask}
             deleteArchiveTask={deleteArchiveTask}
             addArchiveTask={addArchiveTask}
             evaluateArchiveDay={evaluateArchiveDay}
+            futureTasks={futureTasks}
+            addFutureTask={addFutureTask}
+            deleteFutureTask={deleteFutureTask}
           />
         )}
 
@@ -1719,15 +1785,16 @@ Respond ONLY with valid JSON, no other text:
         </button>
 
         <button
-          className={`bottom-nav-item ${activeNav === 'archive' ? 'active' : ''}`}
-          onClick={() => navigate('/home/archive')}
+          className={`bottom-nav-item ${activeNav === 'calendar' ? 'active' : ''}`}
+          onClick={() => navigate('/home/calendar')}
         >
           <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="5" rx="1"/>
-            <path d="M4 8v11a1 1 0 001 1h14a1 1 0 001-1V8"/>
-            <path d="M10 12h4"/>
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
-          <span className="bottom-nav-label">Archive</span>
+          <span className="bottom-nav-label">Calendar</span>
         </button>
 
         <button

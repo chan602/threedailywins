@@ -2841,6 +2841,176 @@ body {
   cursor: not-allowed;
 }
 
+/* ── CALENDAR TAB ── */
+.cal-screen {
+  padding: 1rem 1rem 2rem;
+}
+
+.cal-month-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.cal-month-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cal-month-nav {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  padding: 0.25rem 0.5rem;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: color 0.15s;
+}
+.cal-month-nav:hover { color: var(--text-muted); }
+
+/* 7-column grid */
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 1rem;
+}
+
+.cal-dow {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text-faint);
+  padding: 0.25rem 0;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.cal-cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 0.15s;
+}
+.cal-cell:hover { background: var(--bg-card-hover); }
+.cal-cell-empty { cursor: default; pointer-events: none; }
+
+.cal-day-num {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+/* Past cells: dimmer text */
+.cal-past .cal-day-num { color: var(--text-faint); }
+
+/* Today: accent border + tinted bg */
+.cal-today {
+  border: 1.5px solid var(--accent);
+}
+.cal-today .cal-day-num {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Future: normal */
+.cal-future .cal-day-num { color: var(--text-muted); }
+
+/* Selected: filled accent */
+.cal-selected {
+  background: var(--accent) !important;
+  border-color: var(--accent);
+}
+.cal-selected .cal-day-num { color: #fff !important; font-weight: 600; }
+.cal-selected:hover { background: var(--accent) !important; }
+
+/* Mini completion bar at bottom of past cells */
+.cal-mini-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 3W dot — green pip above day number */
+.cal-3w-dot {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+/* Future task dot — accent pip */
+.cal-future-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* ── CALENDAR DAY PANEL (below grid) ── */
+.cal-day-panel {
+  border-top: 0.5px solid var(--border-light);
+  padding-top: 1rem;
+}
+
+.cal-panel-date-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+}
+
+.cal-today-tag {
+  color: var(--accent);
+}
+
+.cal-panel-card {
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.cal-panel-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.cal-panel-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.cal-future-hint {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  margin: 0.5rem 0 0;
+}
+
 /* ── THREE WINS LOGO BADGE ── */
 .three-wins-logo {
   height: 22px;
