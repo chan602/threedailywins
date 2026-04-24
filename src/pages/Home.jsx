@@ -86,6 +86,8 @@ function Home({ isGuest = false }) {
   const [streak, setStreak] = useState({ current: 0, total: 0, best: 0 })
   const [streakPopupOpen, setStreakPopupOpen] = useState(false)
   const [accomplishments, setAccomplishments] = useState([])
+  // Archive re-eval rate limit (session only, resets on reload)
+  const [reEvalCount, setReEvalCount] = useState(0)
 
   // Friends search state
   const [friendSearch, setFriendSearch] = useState('')
@@ -594,6 +596,21 @@ function Home({ isGuest = false }) {
     await setDoc(doc(db, 'futureTasks', uid, 'days', date), { date, tasks: updated })
   }
 
+  async function updateFutureTask(date, taskId, newText) {
+    if (!uid || !newText.trim()) return
+    if (date === tomorrowStr()) {
+      const existing = tomorrowTasks || []
+      const updated = existing.map(t => t.id === taskId ? { ...t, text: newText.trim() } : t)
+      setTomorrowTasks(updated)
+      await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
+      return
+    }
+    const existing = futureTasks[date] || []
+    const updated = existing.map(t => t.id === taskId ? { ...t, text: newText.trim() } : t)
+    setFutureTasks(prev => ({ ...prev, [date]: updated }))
+    await setDoc(doc(db, 'futureTasks', uid, 'days', date), { date, tasks: updated })
+  }
+
   async function deleteFutureTask(date, taskId) {
     if (!uid) return
     // Tomorrow is owned by the tomorrow queue — route there directly
@@ -610,6 +627,35 @@ function Home({ isGuest = false }) {
       await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
     } else {
       await setDoc(doc(db, 'futureTasks', uid, 'days', date), { date, tasks: updated })
+    }
+  }
+
+  // ── REPEAT TASKS ─────────────────────────────────────
+  // Creates N repeat instances of a future task starting from the next occurrence after startDate.
+  // frequency: 'weekly' | 'monthly', count: 1–12
+  async function createRepeatInstances(startDate, task, frequency, count) {
+    if (!uid) return
+    const tomorrow = tomorrowStr()
+    for (let i = 1; i <= count; i++) {
+      const base = new Date(startDate + 'T12:00:00')
+      if (frequency === 'weekly') {
+        base.setDate(base.getDate() + i * 7)
+      } else {
+        base.setMonth(base.getMonth() + i)
+      }
+      const date = base.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
+      const newTask = { id: uuidv4(), text: task.text, done: false, order: 0, repeat: frequency }
+
+      if (date === tomorrow) {
+        const updated = [...(tomorrowTasks || []), newTask]
+        setTomorrowTasks(updated)
+        await setDoc(tmrwRef, { tasks: updated, date: tomorrow })
+      } else {
+        const existing = futureTasks[date] || []
+        const updated = [...existing, newTask]
+        setFutureTasks(prev => ({ ...prev, [date]: updated }))
+        await setDoc(doc(db, 'futureTasks', uid, 'days', date), { date, tasks: updated })
+      }
     }
   }
 
@@ -947,6 +993,51 @@ Respond ONLY with valid JSON, no other text:
     // onSnapshot will update streak state automatically
   }
 
+  // ── STREAK RECALCULATION FROM CACHE ───────────────────
+  // Used for archive re-evals. winsMap = { [date]: winsDoc } already in memory.
+  // Walks all dates to compute total (count of 3W days) and current (consecutive from today).
+  async function recalculateStreak(winsMap) {
+    if (!uid) return
+    const today = todayStr()
+
+    // Collect all 3W dates
+    const winDates = Object.keys(winsMap)
+      .filter(d => isThreeWinDay(winsMap[d]))
+      .sort() // ascending
+
+    const total = winDates.length
+
+    // Walk backward from today counting consecutive days
+    let current = 0
+    const cursor = new Date(today + 'T12:00:00')
+    while (true) {
+      const ds = cursor.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
+      if (!winDates.includes(ds)) break
+      current++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+
+    // Preserve best from existing doc
+    const snap = await getDoc(streakRef)
+    const existing = snap.exists() ? snap.data() : { best: 0 }
+    const best = Math.max(existing.best || 0, current)
+
+    const lastWinDate = winDates.length > 0 ? winDates[winDates.length - 1] : ''
+
+    await setDoc(streakRef, { current, total, best, lastWinDate })
+
+    // Update leaderboard
+    await setDoc(doc(db, 'leaderboard', uid), {
+      uid,
+      username: userProfile?.username || '',
+      photoURL: user?.photoURL || '',
+      current,
+      total,
+      best,
+      updatedAt: Date.now(),
+    })
+  }
+
   // ── PROFILE ACTIONS ──────────────────────────────────
   async function saveWinDefinitions() {
     if (!uid) return
@@ -1119,8 +1210,13 @@ Respond ONLY with valid JSON, no other text:
       }
       await setDoc(doc(db, 'wins', uid, 'days', date), winsDoc)
       // Update winsCache in place so badges refresh without reloading
-      setWinsCache(prev => ({ ...prev, [date]: winsDoc }))
-      await updateStreak(winsDoc)
+      const updatedCache = { ...winsCache, [date]: winsDoc }
+      // Also merge today's wins so streak calc includes today
+      if (todayWins) updatedCache[todayStr()] = todayWins
+      setWinsCache(updatedCache)
+      // Recalculate streak from full cache — correct for archive re-evals
+      await recalculateStreak(updatedCache)
+      setReEvalCount(c => c + 1)
     } catch (e) {
       console.error('evaluateArchiveDay error:', e)
     }
@@ -1850,8 +1946,11 @@ Respond ONLY with valid JSON, no other text:
             evaluateArchiveDay={evaluateArchiveDay}
             futureTasks={futureTasks}
             addFutureTask={addFutureTask}
+            updateFutureTask={updateFutureTask}
             deleteFutureTask={deleteFutureTask}
+            createRepeatInstances={createRepeatInstances}
             tomorrowTasks={tomorrowTasks}
+            reEvalCount={reEvalCount}
           />
         )}
 

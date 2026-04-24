@@ -3319,6 +3319,68 @@ body {
   gap: 0.4rem;
 }
 
+/* ── REPEAT TASK TAG ── */
+.repeat-tag { background: rgba(139,92,246,0.15); color: rgba(167,139,250,0.9); }
+
+/* ── REPEAT CONFIG PANEL ── */
+.cal-repeat-panel {
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  margin: 0.25rem 0 0.4rem;
+}
+
+.cal-repeat-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cal-repeat-toggle {
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 0.5px solid var(--border-input);
+}
+
+.cal-repeat-opt {
+  flex: 1;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.cal-repeat-opt.active {
+  background: var(--accent);
+  color: #fff;
+}
+.cal-repeat-opt:not(.active):hover {
+  background: var(--bg-card-hover);
+}
+
+.cal-repeat-count-input {
+  width: 42px;
+  background: var(--bg-input);
+  border: 0.5px solid var(--border-input);
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.cal-repeat-count-input:focus { border-color: var(--accent); }
+
 .friends-share-icon {
   width: 20px;
   height: 20px;

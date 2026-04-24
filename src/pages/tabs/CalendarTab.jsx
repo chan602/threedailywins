@@ -36,7 +36,7 @@ function MiniBar({ tasks, winsDoc }) {
 // ── ARCHIVE DAY CARD (past day detail panel) ─────────────
 function ArchiveDayCard({
   day, winsDoc,
-  editingArchiveDay, archiveAddInput, archiveEvalLoading,
+  editingArchiveDay, archiveAddInput, archiveEvalLoading, reEvalCount,
   setArchiveAddInput, setEditingArchiveDay,
   updateArchiveTask, deleteArchiveTask, addArchiveTask, evaluateArchiveDay,
 }) {
@@ -121,12 +121,19 @@ function ArchiveDayCard({
         <button
           className="archive-eval-btn"
           onClick={() => evaluateArchiveDay(day.date, dayTasks)}
-          disabled={archiveEvalLoading === day.date || dayTasks.filter(t => t.done).length === 0}
+          disabled={
+            archiveEvalLoading === day.date ||
+            dayTasks.filter(t => t.done).length === 0 ||
+            (winsDoc?.evaluatedAt && reEvalCount >= 3)
+          }
         >
           {archiveEvalLoading === day.date
             ? 'Evaluating…'
             : winsDoc?.evaluatedAt ? 'Re-evaluate' : 'Evaluate'}
         </button>
+        {winsDoc?.evaluatedAt && reEvalCount >= 3 && (
+          <p className="archive-not-evaluated">Re-eval limit reached (3/session).</p>
+        )}
         {!winsDoc && dayTasks.filter(t => t.done).length === 0 && (
           <p className="archive-not-evaluated">Complete tasks to evaluate.</p>
         )}
@@ -136,14 +143,37 @@ function ArchiveDayCard({
 }
 
 // ── FUTURE DAY PANEL ─────────────────────────────────────
-function FutureDayPanel({ date, tasks, addFutureTask, deleteFutureTask }) {
+function FutureDayPanel({ date, tasks, addFutureTask, updateFutureTask, deleteFutureTask, createRepeatInstances }) {
   const [input, setInput] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [repeatingId, setRepeatingId] = useState(null)
+  const [repeatFreq, setRepeatFreq] = useState('weekly')
+  const [repeatCount, setRepeatCount] = useState(4)
 
   function handleAdd() {
     const text = input.trim()
     if (!text) return
     addFutureTask(date, text)
     setInput('')
+  }
+
+  function startEdit(t) {
+    setEditingId(t.id)
+    setEditText(t.text)
+  }
+
+  function commitEdit(t) {
+    if (editText.trim() && editText.trim() !== t.text) {
+      updateFutureTask(date, t.id, editText.trim())
+    }
+    setEditingId(null)
+    setEditText('')
+  }
+
+  function handleRepeatConfirm(t) {
+    createRepeatInstances(date, t, repeatFreq, repeatCount)
+    setRepeatingId(null)
   }
 
   return (
@@ -153,9 +183,89 @@ function FutureDayPanel({ date, tasks, addFutureTask, deleteFutureTask }) {
           <p className="empty-msg" style={{ marginBottom: '0.5rem' }}>No tasks planned for this day.</p>
         )}
         {tasks.map((t, i) => (
-          <div key={t.id || i} className="task-item" style={{ padding: '0.4rem 0' }}>
-            <span className="task-text" style={{ flex: 1, fontSize: '0.88rem' }}>{t.text}</span>
-            <button className="delete-btn" onClick={() => deleteFutureTask(date, t.id)}>×</button>
+          <div key={t.id || i}>
+            <div className="task-item" style={{ padding: '0.4rem 0' }}>
+              {editingId === t.id ? (
+                <input
+                  className="task-input"
+                  value={editText}
+                  onChange={e => setEditText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitEdit(t)
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  onBlur={() => commitEdit(t)}
+                  autoFocus
+                  style={{ flex: 1, fontSize: '0.88rem' }}
+                />
+              ) : (
+                <span
+                  className="task-text"
+                  style={{ flex: 1, fontSize: '0.88rem', cursor: 'text' }}
+                  onClick={() => startEdit(t)}
+                >
+                  {t.text}
+                  {t.repeat && (
+                    <span className="tag repeat-tag">{t.repeat}</span>
+                  )}
+                </span>
+              )}
+              {editingId !== t.id && (
+                <>
+                  <button
+                    className="profile-cancel-btn"
+                    style={{ padding: '0.15rem 0.4rem', fontSize: '0.72rem', marginLeft: '0.3rem', flexShrink: 0 }}
+                    title="Set repeat"
+                    onClick={() => setRepeatingId(repeatingId === t.id ? null : t.id)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                    </svg>
+                  </button>
+                  <button className="delete-btn" onClick={() => deleteFutureTask(date, t.id)}>×</button>
+                </>
+              )}
+            </div>
+
+            {/* Repeat config panel */}
+            {repeatingId === t.id && (
+              <div className="cal-repeat-panel">
+                <div className="cal-repeat-row">
+                  <div className="cal-repeat-toggle">
+                    <button
+                      className={`cal-repeat-opt${repeatFreq === 'weekly' ? ' active' : ''}`}
+                      onClick={() => setRepeatFreq('weekly')}
+                    >Weekly</button>
+                    <button
+                      className={`cal-repeat-opt${repeatFreq === 'monthly' ? ' active' : ''}`}
+                      onClick={() => setRepeatFreq('monthly')}
+                    >Monthly</button>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>×</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={repeatCount}
+                      onChange={e => setRepeatCount(Math.min(12, Math.max(1, parseInt(e.target.value) || 1)))}
+                      className="cal-repeat-count-input"
+                    />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>
+                      {repeatFreq === 'weekly' ? 'wks' : 'mos'}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                  <button className="friends-search-btn" style={{ fontSize: '0.78rem', padding: '0.3rem 0.75rem' }} onClick={() => handleRepeatConfirm(t)}>
+                    Set repeat
+                  </button>
+                  <button className="profile-cancel-btn" style={{ fontSize: '0.78rem', padding: '0.3rem 0.6rem' }} onClick={() => setRepeatingId(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
         <div className="archive-add-row" style={{ marginTop: tasks.length > 0 ? '0.5rem' : 0 }}>
@@ -183,8 +293,8 @@ export default function CalendarTab({
   editingArchiveDay, archiveAddInput, archiveEvalLoading,
   setArchiveAddInput, setEditingArchiveDay,
   updateArchiveTask, deleteArchiveTask, addArchiveTask, evaluateArchiveDay,
-  futureTasks, addFutureTask, deleteFutureTask,
-  tomorrowTasks,
+  futureTasks, addFutureTask, updateFutureTask, deleteFutureTask, createRepeatInstances,
+  tomorrowTasks, reEvalCount,
 }) {
   const today = todayStr()
   const now = new Date()
@@ -329,6 +439,7 @@ export default function CalendarTab({
                   editingArchiveDay={editingArchiveDay}
                   archiveAddInput={archiveAddInput}
                   archiveEvalLoading={archiveEvalLoading}
+                  reEvalCount={reEvalCount}
                   setArchiveAddInput={setArchiveAddInput}
                   setEditingArchiveDay={setEditingArchiveDay}
                   updateArchiveTask={updateArchiveTask}
@@ -355,7 +466,9 @@ export default function CalendarTab({
               date={selectedDate}
               tasks={selFutureTasks}
               addFutureTask={addFutureTask}
+              updateFutureTask={updateFutureTask}
               deleteFutureTask={deleteFutureTask}
+              createRepeatInstances={createRepeatInstances}
             />
           )}
         </div>
