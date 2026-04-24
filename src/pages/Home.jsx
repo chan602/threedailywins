@@ -1023,19 +1023,14 @@ Respond ONLY with valid JSON, no other text:
   async function recalculateStreak(winsMap) {
     if (!uid) return
 
-    // Merge with full archive so streak is always computed from complete history.
-    // winsMap entries take priority (they carry the latest evaluated data).
-    let fullMap
-    if (Object.keys(winsCache).length > 0) {
-      fullMap = { ...winsCache, ...winsMap }
-    } else {
-      // Calendar tab not opened yet — fetch archive from Firestore
-      fullMap = { ...winsMap }
-      try {
-        const archiveSnap = await getDocs(collection(db, 'wins', uid, 'days'))
-        archiveSnap.forEach(d => { if (!fullMap[d.id]) fullMap[d.id] = d.data() })
-      } catch (e) { console.error('recalculateStreak fetch:', e) }
-    }
+    // Always fetch full wins history from Firestore — guaranteed complete regardless
+    // of whether the Calendar tab has been opened. winsMap entries take priority
+    // (they carry the latest just-evaluated data before Firestore write settles).
+    const fullMap = { ...winsMap }
+    try {
+      const archiveSnap = await getDocs(collection(db, 'wins', uid, 'days'))
+      archiveSnap.forEach(d => { if (!fullMap[d.id]) fullMap[d.id] = d.data() })
+    } catch (e) { console.error('recalculateStreak fetch:', e) }
 
     const DAY_MS = 86400000
     const winDates = Object.keys(fullMap)
