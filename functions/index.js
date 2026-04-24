@@ -1,6 +1,9 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getAuth } = require("firebase-admin/auth");
+const sgMail = require("@sendgrid/mail");
 
 initializeApp();
 const db = getFirestore();
@@ -498,5 +501,100 @@ exports.completeChallenge = onCall(
     });
 
     return { accomplishmentId };
+  }
+);
+
+// ── EMAIL NOTIFICATIONS ──────────────────────────────────
+const APP_URL = "https://threedailywins.com";
+const EMAIL_TYPES = ["challenge", "challenge_accepted", "challenge_completed", "kudos"];
+
+function buildEmailTemplate(notif) {
+  const name = notif.senderDisplayName || "Someone";
+  const task = notif.taskText ? `"${notif.taskText}"` : "";
+  const acc = notif.accomplishmentLabel ? `"${notif.accomplishmentLabel}"` : "";
+
+  const templates = {
+    challenge: {
+      subject: `${name} challenged you on Three Daily Wins`,
+      text: [
+        `${name} challenged you to: ${task}`,
+        "",
+        "Open the app to accept or decline.",
+        APP_URL,
+      ].join("\n"),
+    },
+    challenge_accepted: {
+      subject: `${name} accepted your challenge`,
+      text: [
+        `${name} accepted your challenge: ${task}`,
+        "",
+        "Let's see if they can pull it off.",
+        APP_URL,
+      ].join("\n"),
+    },
+    challenge_completed: {
+      subject: `${name} completed your challenge!`,
+      text: [
+        `${name} completed your challenge: ${task}`,
+        "",
+        "Nice work to both of you.",
+        APP_URL,
+      ].join("\n"),
+    },
+    kudos: {
+      subject: `${name} gave you kudos`,
+      text: [
+        `${name} gave you a thumbs up for: ${acc}`,
+        "",
+        "Keep it up.",
+        APP_URL,
+      ].join("\n"),
+    },
+  };
+
+  return templates[notif.type] || null;
+}
+
+exports.sendEmailNotification = onDocumentCreated(
+  {
+    document: "notifications/{uid}/items/{notifId}",
+    memory: "256MiB",
+    timeoutSeconds: 30,
+    secrets: ["SENDGRID_KEY"],
+  },
+  async (event) => {
+    const uid = event.params.uid;
+    const notif = event.data?.data();
+    if (!notif) return;
+
+    // Only send for relevant notification types
+    if (!EMAIL_TYPES.includes(notif.type)) return;
+
+    try {
+      // Check user's email preference — default-on (send unless explicitly false)
+      const userSnap = await db.doc(`users/${uid}`).get();
+      if (!userSnap.exists) return;
+      if (userSnap.data().emailNotifications === false) return;
+
+      // Get email address from Firebase Auth (always accurate)
+      const userRecord = await getAuth().getUser(uid);
+      const email = userRecord.email;
+      if (!email) return;
+
+      const template = buildEmailTemplate(notif);
+      if (!template) return;
+
+      sgMail.setApiKey(process.env.SENDGRID_KEY);
+      await sgMail.send({
+        to: email,
+        from: { email: "noreply@threedailywins.com", name: "Three Daily Wins" },
+        subject: template.subject,
+        text: template.text,
+      });
+
+      console.log(`Email sent → ${email} [${notif.type}]`);
+    } catch (err) {
+      console.error("sendEmailNotification error:", err.message || err);
+    }
   }
 );

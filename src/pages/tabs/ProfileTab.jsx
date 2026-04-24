@@ -224,6 +224,9 @@ export default function ProfileTab({
   autoSortCompleted,
   setAutoSortCompleted,
   saveAutoSort,
+  emailNotifications,
+  setEmailNotifications,
+  saveEmailNotifications,
 }) {
   const [showSettings, setShowSettings] = useState(false)
 
@@ -396,7 +399,7 @@ export default function ProfileTab({
         {/* Customization */}
         <PillBox
           title="Customization"
-          preview="Auto-sort completed tasks, task behavior"
+          preview="Auto-sort, email notifications, task behavior"
         >
           <div style={{ padding: '0.25rem 0.25rem 0.5rem' }}>
             <div className="theme-toggle-row" style={{ paddingTop: 0 }}>
@@ -410,6 +413,22 @@ export default function ProfileTab({
                   const v = !autoSortCompleted
                   setAutoSortCompleted(v)
                   saveAutoSort(v)
+                }}
+              >
+                <span className="theme-toggle-thumb" />
+              </button>
+            </div>
+            <div className="theme-toggle-row" style={{ borderTop: '0.5px solid var(--border-light)', marginTop: '0.5rem', paddingTop: '0.75rem' }}>
+              <div className="vis-row-left">
+                <span className="vis-label">Email notifications</span>
+                <span className="vis-desc">Get emailed when you receive challenges or kudos</span>
+              </div>
+              <button
+                className={`theme-toggle-btn ${emailNotifications ? 'light' : ''}`}
+                onClick={() => {
+                  const v = !emailNotifications
+                  setEmailNotifications(v)
+                  saveEmailNotifications(v)
                 }}
               >
                 <span className="theme-toggle-thumb" />

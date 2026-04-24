@@ -135,6 +135,7 @@ function Home({ isGuest = false }) {
 
   // Customization state
   const [autoSortCompleted, setAutoSortCompleted] = useState(false)
+  const [emailNotifications, setEmailNotifications] = useState(true)
 
   // Theme state
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark')
@@ -198,6 +199,8 @@ function Home({ isGuest = false }) {
         setVisStats(data.visibility?.stats || 'public')
         setVisArchive(data.visibility?.archive || 'friends')
         setAutoSortCompleted(data.autoSortCompleted || false)
+        // Default-on: treat missing field as true
+        setEmailNotifications(data.emailNotifications !== false)
         setEditBio(data.bio || '')
         if (!data.hasSeenTutorial) setTutorialStep(1)
       }
@@ -967,6 +970,13 @@ Respond ONLY with valid JSON, no other text:
   async function saveAutoSort(val) {
     if (!uid) return
     const updated = { ...userProfile, autoSortCompleted: val }
+    await setDoc(doc(db, 'users', uid), updated)
+    setUserProfile(updated)
+  }
+
+  async function saveEmailNotifications(val) {
+    if (!uid) return
+    const updated = { ...userProfile, emailNotifications: val }
     await setDoc(doc(db, 'users', uid), updated)
     setUserProfile(updated)
   }
@@ -1760,6 +1770,9 @@ Respond ONLY with valid JSON, no other text:
             autoSortCompleted={autoSortCompleted}
             setAutoSortCompleted={setAutoSortCompleted}
             saveAutoSort={saveAutoSort}
+            emailNotifications={emailNotifications}
+            setEmailNotifications={setEmailNotifications}
+            saveEmailNotifications={saveEmailNotifications}
             theme={theme}
             setTheme={setTheme}
             dataActionSuccess={dataActionSuccess}
