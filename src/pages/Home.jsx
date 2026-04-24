@@ -471,21 +471,45 @@ function Home({ isGuest = false }) {
     }
   }, [activeNav, uid])
 
-  // ── MIGRATE TODAY/TOMORROW FUTURE TASKS ON STARTUP ───
-  // Runs once when uid is available — doesn't require calendar tab to be open
+  // ── MIGRATE TODAY/TOMORROW/OVERDUE FUTURE TASKS ON STARTUP ───
+  // Runs once when uid is available — doesn't require calendar tab to be open.
+  // Also catches tasks set for past dates that were never migrated (app not opened that day).
   useEffect(() => {
     if (!uid || isGuest) return
     async function runStartupMigration() {
       const today = todayStr()
       const tomorrow = tomorrowStr()
-      const map = {}
-      for (const date of [today, tomorrow]) {
-        try {
-          const snap = await getDoc(doc(db, 'futureTasks', uid, 'days', date))
-          if (snap.exists()) map[date] = snap.data().tasks || []
-        } catch (e) { /* ignore */ }
+      try {
+        const allSnap = await getDocs(collection(db, 'futureTasks', uid, 'days'))
+        const map = {}
+        const overdueIds = []
+
+        allSnap.forEach(d => {
+          const date = d.id
+          const tasks = d.data().tasks || []
+          if (!tasks.length) return
+
+          if (date === today || date === tomorrow) {
+            map[date] = tasks
+          } else if (date < today) {
+            // Overdue: fold into today's migration bucket so they appear in Today
+            map[today] = [...(map[today] || []), ...tasks]
+            overdueIds.push(date)
+          }
+          // Future dates beyond tomorrow stay in futureTasks — skip
+        })
+
+        if (Object.keys(map).length > 0) await migrateFutureTasks(map)
+
+        // Delete overdue docs (today's doc is handled by migrateFutureTasks)
+        if (overdueIds.length > 0) {
+          await Promise.all(overdueIds.map(date =>
+            deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
+          ))
+        }
+      } catch (e) {
+        console.error('runStartupMigration error:', e)
       }
-      if (Object.keys(map).length > 0) migrateFutureTasks(map)
     }
     runStartupMigration()
   }, [uid])
@@ -994,48 +1018,44 @@ Respond ONLY with valid JSON, no other text:
   }
 
   // ── STREAK RECALCULATION FROM CACHE ───────────────────
-  // Used for archive re-evals. winsMap = { [date]: winsDoc } already in memory.
-  // Walks all dates to compute total (count of 3W days) and current (consecutive from today).
+  // Counts consecutive 3W days from the archive (in-memory). No cursors, no timezone math.
+  // Two dates are consecutive if they are exactly 86400000ms apart using UTC noon as anchor.
   async function recalculateStreak(winsMap) {
     if (!uid) return
-    const today = todayStr()
 
-    // Collect all 3W dates
+    const DAY_MS = 86400000
     const winDates = Object.keys(winsMap)
       .filter(d => isThreeWinDay(winsMap[d]))
-      .sort() // ascending
+      .sort() // 'YYYY-MM-DD' sorts lexicographically = chronologically
 
     const total = winDates.length
-
-    // Walk backward from today counting consecutive days
     let current = 0
-    const cursor = new Date(today + 'T12:00:00')
-    while (true) {
-      const ds = cursor.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
-      if (!winDates.includes(ds)) break
-      current++
-      cursor.setDate(cursor.getDate() - 1)
+    const lastWinDate = winDates[winDates.length - 1] || ''
+
+    // Walk backward from the last win date — stop at first gap
+    for (let i = winDates.length - 1; i >= 0; i--) {
+      if (i === winDates.length - 1) {
+        current = 1
+      } else {
+        const msA = new Date(winDates[i + 1] + 'T12:00:00Z').getTime()
+        const msB = new Date(winDates[i]     + 'T12:00:00Z').getTime()
+        if (msA - msB === DAY_MS) current++
+        else break
+      }
     }
 
-    // Preserve best from existing doc
-    const snap = await getDoc(streakRef)
-    const existing = snap.exists() ? snap.data() : { best: 0 }
-    const best = Math.max(existing.best || 0, current)
+    const best = Math.max(streak.best || 0, current)
 
-    const lastWinDate = winDates.length > 0 ? winDates[winDates.length - 1] : ''
+    // Update UI immediately — don't wait for onSnapshot round-trip
+    setStreak({ current, total, best })
 
-    await setDoc(streakRef, { current, total, best, lastWinDate })
-
-    // Update leaderboard
-    await setDoc(doc(db, 'leaderboard', uid), {
-      uid,
-      username: userProfile?.username || '',
+    // Persist in background
+    setDoc(streakRef, { current, total, best, lastWinDate }).catch(console.error)
+    setDoc(doc(db, 'leaderboard', uid), {
+      uid, username: userProfile?.username || '',
       photoURL: user?.photoURL || '',
-      current,
-      total,
-      best,
-      updatedAt: Date.now(),
-    })
+      current, total, best, updatedAt: Date.now(),
+    }).catch(console.error)
   }
 
   // ── PROFILE ACTIONS ──────────────────────────────────
