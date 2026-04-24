@@ -2,7 +2,21 @@
 // Extracted from Home.jsx. Covers Today, Tomorrow, Weekly,
 // and Daily Habits sub-tabs. All state and logic in Home.
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 
 function weekRangeLabel() {
   const d = new Date()
@@ -14,130 +28,166 @@ function weekRangeLabel() {
   return `${fmt(mon)} – ${fmt(sun)}`
 }
 
-// ── DRAGGABLE TASK LIST ───────────────────────────────────
+// ── GRIP ICON ─────────────────────────────────────────────
+function GripIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+      <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+      <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+    </svg>
+  )
+}
+
+// ── SORTABLE TASK ITEM ────────────────────────────────────
+function SortableTaskItem({
+  t, label, rankClass,
+  listType,
+  editingTaskId, editingTaskText, setEditingTaskId, setEditingTaskText, saveTaskEdit,
+  toggleTask, deleteTask, completeChallenge,
+}) {
+  const {
+    attributes, listeners, setNodeRef,
+    transform, transition, isDragging,
+  } = useSortable({ id: t.id })
+
+  const style = {
+    transform: transform
+      ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)`
+      : undefined,
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 999 : undefined,
+    position: isDragging ? 'relative' : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`task-item ${t.done ? 'done' : ''} ${isDragging ? 'dragging' : ''}`}
+    >
+      {/* Drag handle — listeners only here, so taps on the rest of the row work normally */}
+      <span className="drag-handle" title="Drag to reorder" {...attributes} {...listeners}>
+        <GripIcon />
+      </span>
+
+      <button
+        className={`check-btn ${t.done ? 'checked' : ''}`}
+        onClick={() => {
+          toggleTask(listType, t.id)
+          if (!t.done && t.tag === 'challenge' && t.challengeId && completeChallenge) {
+            completeChallenge(t.challengeId, t.text)
+          }
+        }}
+      />
+
+      <span className={`task-num ${rankClass || ''}`}>{label}</span>
+
+      {editingTaskId === t.id ? (
+        <input
+          className="task-input task-edit-input"
+          value={editingTaskText}
+          onChange={e => setEditingTaskText(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') saveTaskEdit(listType, t.id)
+            if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') }
+          }}
+          onBlur={() => saveTaskEdit(listType, t.id)}
+          autoFocus
+        />
+      ) : (
+        <span
+          className="task-text"
+          onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}
+        >
+          {t.text}
+          {t.carried && (
+            <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-flash' : (t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
+              carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
+            </span>
+          )}
+          {t.fromDTask && <span className="tag daily-tag">daily</span>}
+          {t.tag === 'challenge' && (
+            <span className="tag" style={{ background: 'var(--accent-muted)', color: 'var(--accent)', marginLeft: 4 }}>
+              ⚡ {t.challengerName ? `from @${t.challengerName}` : 'challenge'}
+            </span>
+          )}
+        </span>
+      )}
+
+      <button className="delete-btn" onClick={() => deleteTask(listType, t.id)}>×</button>
+    </div>
+  )
+}
+
+// ── DRAGGABLE TASK LIST (dnd-kit, touch + mouse) ──────────
 function DraggableTaskList({
-  tasks, listType,
+  tasks, listType, labelPrefix,
   editingTaskId, editingTaskText, setEditingTaskId, setEditingTaskText, saveTaskEdit,
   toggleTask, deleteTask, reorderTask, completeChallenge,
   autoSortCompleted,
 }) {
-  const [dragOverId, setDragOverId] = useState(null)
-  const dragId = useRef(null)
+  const sensors = useSensors(
+    // Mouse/trackpad: activate after 5px movement (avoids accidental drags on clicks)
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // Touch: activate after 150ms press-hold with ≤5px drift (avoids scroll conflicts)
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  )
 
+  // Seed order field if missing
   const seeded = tasks.map((t, i) => t.order != null ? t : { ...t, order: i })
   const byOrder = [...seeded].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-  const sorted = autoSortCompleted
+  const displayed = autoSortCompleted
     ? [...byOrder.filter(t => !t.done), ...byOrder.filter(t => t.done)]
     : byOrder
 
-  let rankCounter = 0
-
-  function handleDragStart(e, t) {
-    dragId.current = t.id
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  function handleDragOver(e, t) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    if (t.id !== dragId.current) setDragOverId(t.id)
-  }
-
-  function handleDrop(e, targetTask) {
-    e.preventDefault()
-    setDragOverId(null)
-    const fromId = dragId.current
-    dragId.current = null
-    if (!fromId || fromId === targetTask.id) return
-
-    const fromIdx = sorted.findIndex(t => t.id === fromId)
-    const toIdx   = sorted.findIndex(t => t.id === targetTask.id)
-    if (fromIdx === -1 || toIdx === -1) return
-
-    const reordered = [...sorted]
-    const [moved] = reordered.splice(fromIdx, 1)
-    reordered.splice(toIdx, 0, moved)
-    const withNewOrder = reordered.map((t, i) => ({ ...t, order: i }))
-
-    reorderTask(listType, withNewOrder)
-  }
-
-  function handleDragEnd() {
-    dragId.current = null
-    setDragOverId(null)
+  function handleDragEnd(event) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIdx = displayed.findIndex(t => t.id === active.id)
+    const newIdx = displayed.findIndex(t => t.id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    const reordered = arrayMove(displayed, oldIdx, newIdx)
+    const withOrder = reordered.map((t, i) => ({ ...t, order: i }))
+    reorderTask(listType, withOrder)
   }
 
   if (tasks.length === 0) {
     return <div className="task-list"><p className="empty-msg">No tasks yet</p></div>
   }
 
+  // Rank counter for coloring T1/T2/T3 (today list only)
+  let rankCounter = 0
+
   return (
     <div className="task-list">
-      {sorted.map((t, visualIdx) => {
-        const rank = !t.done ? ++rankCounter : null
-        const rankClass = rank === 1 ? 'task-rank-1' : rank === 2 ? 'task-rank-2' : rank === 3 ? 'task-rank-3' : ''
-        const isDragOver = dragOverId === t.id
-
-        return (
-          <div
-            key={t.id}
-            className={`task-item ${t.done ? 'done' : ''} ${isDragOver ? 'drag-over' : ''}`}
-            draggable
-            onDragStart={e => handleDragStart(e, t)}
-            onDragOver={e => handleDragOver(e, t)}
-            onDrop={e => handleDrop(e, t)}
-            onDragEnd={handleDragEnd}
-          >
-            <span className="drag-handle" title="Drag to reorder">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
-                <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
-                <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
-              </svg>
-            </span>
-
-            <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => {
-              toggleTask(listType, t.id)
-              if (!t.done && t.tag === 'challenge' && t.challengeId && completeChallenge) {
-                completeChallenge(t.challengeId, t.text)
-              }
-            }} />
-
-            <span className={`task-num ${rankClass}`}>T{visualIdx + 1}</span>
-
-            {editingTaskId === t.id ? (
-              <input
-                className="task-input task-edit-input"
-                value={editingTaskText}
-                onChange={e => setEditingTaskText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') saveTaskEdit(listType, t.id)
-                  if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') }
-                }}
-                onBlur={() => saveTaskEdit(listType, t.id)}
-                autoFocus
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={displayed.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          {displayed.map((t, visualIdx) => {
+            const rank = !t.done ? ++rankCounter : null
+            const rankClass = rank === 1 ? 'task-rank-1' : rank === 2 ? 'task-rank-2' : rank === 3 ? 'task-rank-3' : ''
+            const label = `${labelPrefix}${visualIdx + 1}`
+            return (
+              <SortableTaskItem
+                key={t.id}
+                t={t}
+                label={label}
+                rankClass={rankClass}
+                listType={listType}
+                editingTaskId={editingTaskId}
+                editingTaskText={editingTaskText}
+                setEditingTaskId={setEditingTaskId}
+                setEditingTaskText={setEditingTaskText}
+                saveTaskEdit={saveTaskEdit}
+                toggleTask={toggleTask}
+                deleteTask={deleteTask}
+                completeChallenge={completeChallenge}
               />
-            ) : (
-              <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
-                {t.text}
-                {t.carried && (
-                  <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-flash' : (t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
-                    carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
-                  </span>
-                )}
-                {t.fromDTask && <span className="tag daily-tag">daily</span>}
-                {t.tag === 'challenge' && (
-                  <span className="tag" style={{ background: 'var(--accent-muted)', color: 'var(--accent)', marginLeft: 4 }}>
-                    ⚡ {t.challengerName ? `from @${t.challengerName}` : 'challenge'}
-                  </span>
-                )}
-              </span>
-            )}
-
-            <button className="delete-btn" onClick={() => deleteTask(listType, t.id)}>×</button>
-          </div>
-        )
-      })}
+            )
+          })}
+        </SortableContext>
+      </DndContext>
     </div>
   )
 }
@@ -228,6 +278,7 @@ export default function TodayTab({
           <DraggableTaskList
             tasks={todayTasks}
             listType="today"
+            labelPrefix="T"
             editingTaskId={editingTaskId}
             editingTaskText={editingTaskText}
             setEditingTaskId={setEditingTaskId}
@@ -335,33 +386,20 @@ export default function TodayTab({
             />
             <button className={`add-btn${addFlash ? ' add-btn-flash' : ''}`} onClick={addTask}>+</button>
           </div>
-          <div className="task-list">
-            {tomorrowTasks.length === 0 && <p className="empty-msg">Nothing queued</p>}
-            {[...tomorrowTasks].sort((a, b) => a.done === b.done ? 0 : a.done ? 1 : -1).map((t, i) => (
-              <div key={t.id} className={`task-item ${t.done ? 'done' : ''}`}>
-                <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => toggleTask('tomorrow', t.id)} />
-                <span className="task-num">Tm{i + 1}</span>
-                {editingTaskId === t.id ? (
-                  <input
-                    className="task-input task-edit-input"
-                    value={editingTaskText}
-                    onChange={e => setEditingTaskText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') saveTaskEdit('tomorrow', t.id)
-                      if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') }
-                    }}
-                    onBlur={() => saveTaskEdit('tomorrow', t.id)}
-                    autoFocus
-                  />
-                ) : (
-                  <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
-                    {t.text}
-                  </span>
-                )}
-                <button className="delete-btn" onClick={() => deleteTask('tomorrow', t.id)}>×</button>
-              </div>
-            ))}
-          </div>
+          <DraggableTaskList
+            tasks={tomorrowTasks}
+            listType="tomorrow"
+            labelPrefix="Tm"
+            editingTaskId={editingTaskId}
+            editingTaskText={editingTaskText}
+            setEditingTaskId={setEditingTaskId}
+            setEditingTaskText={setEditingTaskText}
+            saveTaskEdit={saveTaskEdit}
+            toggleTask={toggleTask}
+            deleteTask={deleteTask}
+            reorderTask={reorderTask}
+            autoSortCompleted={false}
+          />
         </div>
       )}
 
@@ -381,38 +419,20 @@ export default function TodayTab({
             />
             <button className={`add-btn${addFlash ? ' add-btn-flash' : ''}`} onClick={addTask}>+</button>
           </div>
-          <div className="task-list">
-            {weeklyTasks.length === 0 && <p className="empty-msg">No weekly goals</p>}
-            {[...weeklyTasks].sort((a, b) => a.done === b.done ? 0 : a.done ? 1 : -1).map((t, i) => (
-              <div key={t.id} className={`task-item ${t.done ? 'done' : ''}`}>
-                <button className={`check-btn ${t.done ? 'checked' : ''}`} onClick={() => toggleTask('weekly', t.id)} />
-                <span className="task-num">W{i + 1}</span>
-                {editingTaskId === t.id ? (
-                  <input
-                    className="task-input task-edit-input"
-                    value={editingTaskText}
-                    onChange={e => setEditingTaskText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') saveTaskEdit('weekly', t.id)
-                      if (e.key === 'Escape') { setEditingTaskId(null); setEditingTaskText('') }
-                    }}
-                    onBlur={() => saveTaskEdit('weekly', t.id)}
-                    autoFocus
-                  />
-                ) : (
-                  <span className="task-text" onDoubleClick={() => { setEditingTaskId(t.id); setEditingTaskText(t.text) }}>
-                    {t.text}
-                    {t.carried && (
-                      <span className={`tag carried-tag${(t.carryCount || 1) >= 6 ? ' carried-tag-flash' : (t.carryCount || 1) >= 3 ? ' carried-tag-urgent' : (t.carryCount || 1) >= 2 ? ' carried-tag-warn' : ''}`}>
-                        carried{(t.carryCount || 1) > 1 ? ` ×${t.carryCount}` : ''}
-                      </span>
-                    )}
-                  </span>
-                )}
-                <button className="delete-btn" onClick={() => deleteTask('weekly', t.id)}>×</button>
-              </div>
-            ))}
-          </div>
+          <DraggableTaskList
+            tasks={weeklyTasks}
+            listType="weekly"
+            labelPrefix="W"
+            editingTaskId={editingTaskId}
+            editingTaskText={editingTaskText}
+            setEditingTaskId={setEditingTaskId}
+            setEditingTaskText={setEditingTaskText}
+            saveTaskEdit={saveTaskEdit}
+            toggleTask={toggleTask}
+            deleteTask={deleteTask}
+            reorderTask={reorderTask}
+            autoSortCompleted={false}
+          />
 
           <p className="section-label" style={{ marginTop: '1.5rem' }}>Daily habits</p>
           <div className="add-row">

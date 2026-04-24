@@ -587,6 +587,48 @@ function buildEmailTemplate(notif) {
   return templates[notif.type] || null;
 }
 
+exports.sendFriendRequestEmail = onDocumentCreated(
+  {
+    document: "friendRequests/{uid}/incoming/{requestId}",
+    memory: "256MiB",
+    timeoutSeconds: 30,
+    secrets: ["SENDGRID_KEY"],
+  },
+  async (event) => {
+    const uid = event.params.uid;
+    const req = event.data?.data();
+    if (!req) return;
+
+    try {
+      const userSnap = await db.doc(`users/${uid}`).get();
+      if (!userSnap.exists) return;
+      if (userSnap.data().emailNotifications === false) return;
+
+      const userRecord = await getAuth().getUser(uid);
+      const email = userRecord.email;
+      if (!email) return;
+
+      const senderName = req.username || "Someone";
+      sgMail.setApiKey(process.env.SENDGRID_KEY);
+      await sgMail.send({
+        to: email,
+        from: { email: "noreply@threedailywins.com", name: "Three Daily Wins" },
+        subject: `${senderName} sent you a friend request`,
+        html: emailHtml(
+          `${senderName} sent you a friend request`,
+          [`${senderName} wants to connect with you on Three Daily Wins.`, "Accept or decline in the app."],
+          "View request",
+          APP_URL,
+        ),
+      });
+
+      console.log(`Friend request email sent → ${email} from ${senderName}`);
+    } catch (err) {
+      console.error("sendFriendRequestEmail error:", err.message || err);
+    }
+  }
+);
+
 exports.sendEmailNotification = onDocumentCreated(
   {
     document: "notifications/{uid}/items/{notifId}",

@@ -640,10 +640,16 @@ function Home({ isGuest = false }) {
 
   async function reorderTask(type, reorderedTasks) {
     if (type === 'today') {
-      if (isGuest) { setTodayTasks(reorderedTasks); return }
+      setTodayTasks(reorderedTasks)
+      if (isGuest) return
       await setDoc(todayRef, { tasks: reorderedTasks, date: todayStr() })
+    } else if (type === 'tomorrow') {
+      setTomorrowTasks(reorderedTasks)
+      if (isGuest) return
+      await setDoc(tmrwRef, { tasks: reorderedTasks, date: tomorrowStr() })
     } else if (type === 'weekly') {
-      if (isGuest) { setWeeklyTasks(reorderedTasks); return }
+      setWeeklyTasks(reorderedTasks)
+      if (isGuest) return
       await setDoc(weekRef, { tasks: reorderedTasks, weekKey: weekKey() })
     }
   }
