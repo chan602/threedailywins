@@ -1034,7 +1034,7 @@ Respond ONLY with valid JSON, no other text:
 
     const DAY_MS = 86400000
     const winDates = Object.keys(fullMap)
-      .filter(d => isThreeWinDay(fullMap[d]))
+      .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && isThreeWinDay(fullMap[d]))
       .sort() // 'YYYY-MM-DD' sorts lexicographically = chronologically
 
     const total = winDates.length
