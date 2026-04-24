@@ -304,6 +304,11 @@ function Home({ isGuest = false }) {
     const merged = allTasks.filter(t => seen.has(t.id) ? false : seen.add(t.id))
     await setDoc(todayRef, { tasks: merged, date: today })
 
+    // Delete the old tomorrow doc so it can't bleed into the tomorrow queue
+    if (tmrwSnap.exists()) {
+      await deleteDoc(doc(db, 'tasks', uid, 'tomorrow', today))
+    }
+
     // Weekly rollover on Monday
     const dayOfWeek = new Date().getDay()
     if (dayOfWeek === 1 && meta.lastWeekRollover !== weekKey()) {
@@ -580,9 +585,12 @@ function Home({ isGuest = false }) {
     for (const date of [today, tomorrow]) {
       const tasks = map[date]
       if (!tasks?.length) continue
-      const targetCol = date === today ? 'today' : 'tomorrow'
+      // Today uses a static 'data' doc; tomorrow uses a date-keyed doc (matches tmrwRef + onSnapshot)
+      const targetRef = date === today
+        ? doc(db, 'tasks', uid, 'today', 'data')
+        : tmrwRef
       try {
-        const snap = await getDoc(doc(db, 'tasks', uid, targetCol, 'data'))
+        const snap = await getDoc(targetRef)
         const current = snap.exists() ? (snap.data().tasks || []) : []
         const existingTexts = new Set(current.map(t => t.text))
         const toAdd = tasks
@@ -590,11 +598,11 @@ function Home({ isGuest = false }) {
           .map((t, i) => ({ ...t, fromFuture: true, order: current.length + i }))
         if (toAdd.length > 0) {
           const merged = [...current, ...toAdd]
-          await setDoc(doc(db, 'tasks', uid, targetCol, 'data'), { tasks: merged })
+          await setDoc(targetRef, { tasks: merged })
           if (date === today) setTodayTasks(merged)
           else setTomorrowTasks(merged)
         }
-        // Clean up futureTasks doc — tomorrow queue is now the single source of truth for both dates
+        // Clean up futureTasks doc — queue is now single source of truth
         await deleteDoc(doc(db, 'futureTasks', uid, 'days', date))
         setFutureTasks(prev => { const n = { ...prev }; delete n[date]; return n })
       } catch (e) {
