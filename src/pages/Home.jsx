@@ -862,7 +862,7 @@ Respond ONLY with valid JSON, no other text:
         setTodayWins(winsDoc)
       } else {
         await setDoc(winsRef, winsDoc)
-        await updateStreak(winsDoc)
+        await recalculateStreak({ [todayStr()]: winsDoc })
       }
       // Flash achieved win rows — persists until next eval
       const flash = {
@@ -899,7 +899,7 @@ Respond ONLY with valid JSON, no other text:
       [noteKey]: overrideComments[win].trim()
     }
     await setDoc(winsRef, updated, { merge: true })
-    await updateStreak(updated)
+    await recalculateStreak({ [todayStr()]: updated })
     setOverrideOpen(prev => ({ ...prev, [win]: false }))
   }
 
@@ -909,7 +909,7 @@ Respond ONLY with valid JSON, no other text:
     const noteKey = `note${win.charAt(0).toUpperCase() + win.slice(1)}`
     const updated = { ...todayWins, [key]: null, [noteKey]: '' }
     await setDoc(winsRef, updated, { merge: true })
-    await updateStreak(updated)
+    await recalculateStreak({ [todayStr()]: updated })
     setOverrideComments(prev => ({ ...prev, [win]: '' }))
     setOverrideOpen(prev => ({ ...prev, [win]: false }))
   }
@@ -1023,16 +1023,30 @@ Respond ONLY with valid JSON, no other text:
   async function recalculateStreak(winsMap) {
     if (!uid) return
 
+    // Merge with full archive so streak is always computed from complete history.
+    // winsMap entries take priority (they carry the latest evaluated data).
+    let fullMap
+    if (Object.keys(winsCache).length > 0) {
+      fullMap = { ...winsCache, ...winsMap }
+    } else {
+      // Calendar tab not opened yet — fetch archive from Firestore
+      fullMap = { ...winsMap }
+      try {
+        const archiveSnap = await getDocs(collection(db, 'wins', uid, 'days'))
+        archiveSnap.forEach(d => { if (!fullMap[d.id]) fullMap[d.id] = d.data() })
+      } catch (e) { console.error('recalculateStreak fetch:', e) }
+    }
+
     const DAY_MS = 86400000
-    const winDates = Object.keys(winsMap)
-      .filter(d => isThreeWinDay(winsMap[d]))
+    const winDates = Object.keys(fullMap)
+      .filter(d => isThreeWinDay(fullMap[d]))
       .sort() // 'YYYY-MM-DD' sorts lexicographically = chronologically
 
     const total = winDates.length
     let current = 0
     const lastWinDate = winDates[winDates.length - 1] || ''
 
-    // Walk backward from the last win date — stop at first gap
+    // Walk backward from the most recent win — stop at first gap
     for (let i = winDates.length - 1; i >= 0; i--) {
       if (i === winDates.length - 1) {
         current = 1
