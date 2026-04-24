@@ -506,49 +506,81 @@ exports.completeChallenge = onCall(
 
 // ── EMAIL NOTIFICATIONS ──────────────────────────────────
 const APP_URL = "https://threedailywins.com";
-const EMAIL_TYPES = ["challenge", "challenge_accepted", "challenge_completed", "kudos"];
+const ICON_URL = "https://threedailywins.com/icons/icon-192.png";
+// Types that trigger an email to the recipient:
+// - nudge: someone nudged you
+// - challenge: someone challenged you
+// - challenge_completed: someone completed YOUR challenge (you're the sender)
+const EMAIL_TYPES = ["nudge", "challenge", "challenge_completed"];
+
+function emailHtml(subject, bodyLines, ctaText, ctaUrl) {
+  const bodyHtml = bodyLines.map(l => l ? `<p style="margin:0 0 12px">${l}</p>` : "").join("");
+  const ctaBlock = ctaText && ctaUrl
+    ? `<a href="${ctaUrl}" style="display:inline-block;margin-top:8px;padding:10px 22px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.95rem">${ctaText}</a>`
+    : `<a href="${APP_URL}" style="display:inline-block;margin-top:8px;padding:10px 22px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.95rem">Open Three Daily Wins</a>`;
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0f0f13;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e2e8f0">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:40px auto">
+    <tr><td style="padding:32px 32px 24px;background:#1a1a2e;border-radius:16px 16px 0 0;text-align:center;border-bottom:1px solid #2d2d4e">
+      <img src="${ICON_URL}" width="56" height="56" alt="3W" style="border-radius:12px;display:block;margin:0 auto 12px">
+      <span style="font-size:0.8rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#7c3aed">Three Daily Wins</span>
+    </td></tr>
+    <tr><td style="padding:28px 32px 8px;background:#1a1a2e">
+      <h2 style="margin:0 0 16px;font-size:1.15rem;font-weight:700;color:#f1f5f9">${subject}</h2>
+      <div style="font-size:0.95rem;line-height:1.6;color:#94a3b8">${bodyHtml}</div>
+    </td></tr>
+    <tr><td style="padding:8px 32px 32px;background:#1a1a2e;border-radius:0 0 16px 16px">
+      ${ctaBlock}
+    </td></tr>
+    <tr><td style="padding:20px 0;text-align:center">
+      <p style="font-size:0.75rem;color:#4a4a6a;margin:0">You're receiving this because email notifications are on.</p>
+      <p style="font-size:0.75rem;color:#4a4a6a;margin:4px 0 0">Turn them off in <a href="${APP_URL}/home/profile" style="color:#7c3aed;text-decoration:none">Settings → Customization</a>.</p>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
 
 function buildEmailTemplate(notif) {
   const name = notif.senderDisplayName || "Someone";
   const task = notif.taskText ? `"${notif.taskText}"` : "";
   const acc = notif.accomplishmentLabel ? `"${notif.accomplishmentLabel}"` : "";
 
+  // For challenge_completed: link to completer's profile if username available
+  const completerProfile = notif.senderUsername
+    ? `${APP_URL}/u/${notif.senderUsername}`
+    : APP_URL;
+
   const templates = {
-    challenge: {
-      subject: `${name} challenged you on Three Daily Wins`,
-      text: [
-        `${name} challenged you to: ${task}`,
-        "",
-        "Open the app to accept or decline.",
+    nudge: {
+      subject: `${name} nudged you`,
+      html: emailHtml(
+        `${name} nudged you`,
+        [`${name} gave you a nudge${task ? ` about: ${task}` : ""}.`, "Sometimes that's all it takes."],
+        "Open the app",
         APP_URL,
-      ].join("\n"),
+      ),
     },
-    challenge_accepted: {
-      subject: `${name} accepted your challenge`,
-      text: [
-        `${name} accepted your challenge: ${task}`,
-        "",
-        "Let's see if they can pull it off.",
+    challenge: {
+      subject: `${name} challenged you`,
+      html: emailHtml(
+        `${name} challenged you`,
+        [`${name} challenged you to: ${task}`, "Accept or decline in the app."],
+        "View challenge",
         APP_URL,
-      ].join("\n"),
+      ),
     },
     challenge_completed: {
-      subject: `${name} completed your challenge!`,
-      text: [
-        `${name} completed your challenge: ${task}`,
-        "",
-        "Nice work to both of you.",
-        APP_URL,
-      ].join("\n"),
-    },
-    kudos: {
-      subject: `${name} gave you kudos`,
-      text: [
-        `${name} gave you a thumbs up for: ${acc}`,
-        "",
-        "Keep it up.",
-        APP_URL,
-      ].join("\n"),
+      subject: `${name} completed your challenge`,
+      html: emailHtml(
+        `${name} completed your challenge`,
+        [`${name} completed your challenge: ${task}`, "Send them some kudos for pulling it off."],
+        "Send kudos →",
+        completerProfile,
+      ),
     },
   };
 
@@ -589,7 +621,7 @@ exports.sendEmailNotification = onDocumentCreated(
         to: email,
         from: { email: "noreply@threedailywins.com", name: "Three Daily Wins" },
         subject: template.subject,
-        text: template.text,
+        html: template.html,
       });
 
       console.log(`Email sent → ${email} [${notif.type}]`);
