@@ -872,7 +872,7 @@ Respond ONLY with valid JSON, no other text:
         setTodayWins(winsDoc)
       } else {
         await setDoc(winsRef, winsDoc)
-        await recalculateStreak({ [todayStr()]: winsDoc })
+        await recalculateStreak()
       }
       // Flash achieved win rows — persists until next eval
       const flash = {
@@ -909,7 +909,7 @@ Respond ONLY with valid JSON, no other text:
       [noteKey]: overrideComments[win].trim()
     }
     await setDoc(winsRef, updated, { merge: true })
-    await recalculateStreak({ [todayStr()]: updated })
+    await recalculateStreak()
     setOverrideOpen(prev => ({ ...prev, [win]: false }))
   }
 
@@ -919,162 +919,98 @@ Respond ONLY with valid JSON, no other text:
     const noteKey = `note${win.charAt(0).toUpperCase() + win.slice(1)}`
     const updated = { ...todayWins, [key]: null, [noteKey]: '' }
     await setDoc(winsRef, updated, { merge: true })
-    await recalculateStreak({ [todayStr()]: updated })
+    await recalculateStreak()
     setOverrideComments(prev => ({ ...prev, [win]: '' }))
     setOverrideOpen(prev => ({ ...prev, [win]: false }))
   }
 
-  // ── STREAK ────────────────────────────────────────────
-  async function updateStreak(winsData) {
-    const todayIsWin = isThreeWinDay(winsData)
-
-    const snap = await getDoc(streakRef)
-    const existing = snap.exists()
-      ? snap.data()
-      : { current: 0, total: 0, best: 0, lastWinDate: '' }
-
-    let { current, total, best, lastWinDate } = existing
-
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    const yStr = yesterday.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' })
-    const today = todayStr()
-
-    if (todayIsWin) {
-      if (lastWinDate === today) {
-        // Already counted today — no change needed
-      } else if (lastWinDate === yStr) {
-        // Extending streak from yesterday
-        current = current + 1
-        total = (total || 0) + 1
-        best = Math.max(best || 0, current)
-        lastWinDate = today
-      } else {
-        // Gap in streak — start fresh
-        current = 1
-        total = (total || 0) + 1
-        best = Math.max(best || 0, 1)
-        lastWinDate = today
-      }
-    } else {
-      // Not a three-win day after re-eval
-      if (lastWinDate === today) {
-        // Today was previously a win, roll it back
-        current = Math.max(0, current - 1)
-        total = Math.max(0, total - 1)
-        lastWinDate = yStr
-      }
-      // else: today was never counted, nothing to change
-    }
-
-    await setDoc(streakRef, { current, total, best, lastWinDate })
-
-    // Write public leaderboard entry
-    await setDoc(doc(db, 'leaderboard', uid), {
-      uid,
-      username: userProfile?.username || '',
-      photoURL: user?.photoURL || '',
-      current,
-      total,
-      best,
-      updatedAt: Date.now()
-    })
-
-    // ── AUTO MILESTONES ──────────────────────────────────
-    const milestones = [5, 10, 25, 50, 100]
-    const writes = []
-
-    // Total wins milestones — only fire when we just crossed the threshold
-    const prevTotal = existing.total || 0
-    for (const m of milestones) {
-      if (prevTotal < m && total >= m) {
-        writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', `total_${m}`), {
-          type: 'streak_milestone',
-          streakCount: m,
-          label: `${m} total wins`,
-          createdAt: Date.now(),
-          kudosCount: 0,
-        }))
-      }
-    }
-
-    // Current streak milestones — only fire when we just crossed the threshold
-    const prevCurrent = existing.current || 0
-    for (const m of milestones) {
-      if (prevCurrent < m && current >= m) {
-        writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', `streak_${m}`), {
-          type: 'streak_milestone',
-          streakCount: m,
-          label: `${m}-day streak`,
-          createdAt: Date.now(),
-          kudosCount: 0,
-        }))
-      }
-    }
-
-    // First three-win day
-    if (todayIsWin && (existing.total || 0) === 0) {
-      writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', 'first_three_win_day'), {
-        type: 'three_win_day',
-        label: 'First three-win day',
-        date: todayStr(),
-        createdAt: Date.now(),
-        kudosCount: 0,
-      }))
-    }
-
-    if (writes.length > 0) await Promise.all(writes)
-    // onSnapshot will update streak state automatically
-  }
-
-  // ── STREAK RECALCULATION FROM CACHE ───────────────────
-  // Counts consecutive 3W days from the archive (in-memory). No cursors, no timezone math.
-  // Two dates are consecutive if they are exactly 86400000ms apart using UTC noon as anchor.
-  async function recalculateStreak(winsMap) {
+  // ── STREAK RECALCULATION ─────────────────────────────────
+  // Fetches full wins history from Firestore and recomputes from scratch.
+  // Walk backward from today (or yesterday) while days are consecutive wins.
+  async function recalculateStreak() {
     if (!uid) return
 
-    // Always fetch full wins history from Firestore — guaranteed complete regardless
-    // of whether the Calendar tab has been opened. winsMap entries take priority
-    // (they carry the latest just-evaluated data before Firestore write settles).
-    const fullMap = { ...winsMap }
+    // Fetch all win docs
+    let winsSnap
     try {
-      const archiveSnap = await getDocs(collection(db, 'wins', uid, 'days'))
-      archiveSnap.forEach(d => { if (!fullMap[d.id]) fullMap[d.id] = d.data() })
-    } catch (e) { console.error('recalculateStreak fetch:', e) }
-
-    const DAY_MS = 86400000
-    const winDates = Object.keys(fullMap)
-      .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d) && isThreeWinDay(fullMap[d]))
-      .sort() // 'YYYY-MM-DD' sorts lexicographically = chronologically
-
-    const total = winDates.length
-    let current = 0
-    const lastWinDate = winDates[winDates.length - 1] || ''
-
-    // Walk backward from the most recent win — stop at first gap
-    for (let i = winDates.length - 1; i >= 0; i--) {
-      if (i === winDates.length - 1) {
-        current = 1
-      } else {
-        const msA = new Date(winDates[i + 1] + 'T12:00:00Z').getTime()
-        const msB = new Date(winDates[i]     + 'T12:00:00Z').getTime()
-        if (msA - msB === DAY_MS) current++
-        else break
-      }
+      winsSnap = await getDocs(collection(db, 'wins', uid, 'days'))
+    } catch (e) {
+      console.error('recalculateStreak fetch:', e)
+      return
     }
 
-    const best = Math.max(streak.best || 0, current)
+    // Build Set of 3-win dates + total count
+    const winSet = new Set()
+    let total = 0
+    winsSnap.forEach(d => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d.id) && isThreeWinDay(d.data())) {
+        winSet.add(d.id)
+        total++
+      }
+    })
 
-    // Update UI immediately — don't wait for onSnapshot round-trip
+    // Walk backward from today (or yesterday if today isn't a win yet)
+    const today = todayStr()
+    const cursor = new Date(today + 'T12:00:00Z')
+    if (!winSet.has(today)) cursor.setDate(cursor.getDate() - 1)
+    const walkStart = cursor.toLocaleDateString('en-CA')
+
+    let current = 0
+    while (winSet.has(cursor.toLocaleDateString('en-CA'))) {
+      current++
+      cursor.setDate(cursor.getDate() - 1)
+    }
+
+    const lastWinDate = current > 0 ? walkStart : ''
+
+    // Read existing streak for best + milestone comparison
+    const existingSnap = await getDoc(streakRef)
+    const existing = existingSnap.exists() ? existingSnap.data() : { current: 0, total: 0, best: 0 }
+    const prevTotal = existing.total || 0
+    const prevCurrent = existing.current || 0
+    const best = Math.max(existing.best || 0, current)
+
+    // Update UI immediately
     setStreak({ current, total, best })
 
-    // Persist in background
+    // Persist streak + leaderboard in background
     setDoc(streakRef, { current, total, best, lastWinDate }).catch(console.error)
     setDoc(doc(db, 'leaderboard', uid), {
       uid, username: userProfile?.username || '',
       photoURL: user?.photoURL || '',
       current, total, best, updatedAt: Date.now(),
     }).catch(console.error)
+
+    // ── AUTO MILESTONES ──────────────────────────────────
+    const milestones = [5, 10, 25, 50, 100]
+    const writes = []
+
+    for (const m of milestones) {
+      if (prevTotal < m && total >= m) {
+        writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', `total_${m}`), {
+          type: 'streak_milestone', streakCount: m,
+          label: `${m} total wins`, createdAt: Date.now(), kudosCount: 0,
+        }))
+      }
+    }
+
+    for (const m of milestones) {
+      if (prevCurrent < m && current >= m) {
+        writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', `streak_${m}`), {
+          type: 'streak_milestone', streakCount: m,
+          label: `${m}-day streak`, createdAt: Date.now(), kudosCount: 0,
+        }))
+      }
+    }
+
+    if (winSet.has(today) && prevTotal === 0) {
+      writes.push(setDoc(doc(db, 'accomplishments', uid, 'items', 'first_three_win_day'), {
+        type: 'three_win_day', label: 'First three-win day',
+        date: today, createdAt: Date.now(), kudosCount: 0,
+      }))
+    }
+
+    if (writes.length > 0) await Promise.all(writes)
   }
 
   // ── PROFILE ACTIONS ──────────────────────────────────
@@ -1250,13 +1186,9 @@ Respond ONLY with valid JSON, no other text:
         overrideSpiritual: null,
       }
       await setDoc(doc(db, 'wins', uid, 'days', date), winsDoc)
-      // Update winsCache in place so badges refresh without reloading
-      const updatedCache = { ...winsCache, [date]: winsDoc }
-      // Also merge today's wins so streak calc includes today
-      if (todayWins) updatedCache[todayStr()] = todayWins
-      setWinsCache(updatedCache)
-      // Recalculate streak from full cache — correct for archive re-evals
-      await recalculateStreak(updatedCache)
+      // Update winsCache so calendar badges refresh without reloading
+      setWinsCache(prev => ({ ...prev, [date]: winsDoc }))
+      await recalculateStreak()
       setReEvalCount(c => c + 1)
     } catch (e) {
       console.error('evaluateArchiveDay error:', e)

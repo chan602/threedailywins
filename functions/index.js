@@ -41,6 +41,54 @@ function isThreeWinDay(w) {
   return p && m && s
 }
 
+// ── RECALCULATE STREAK FOR ONE USER ──────────────────────
+// Walk backward from today (or yesterday) while days are consecutive wins.
+async function recalculateStreakForUser(uid, today) {
+  // Build Set of 3-win dates + total count
+  const winsSnap = await db.collection('wins').doc(uid).collection('days').get()
+  const winSet = new Set()
+  let total = 0
+  winsSnap.forEach(d => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d.id) && isThreeWinDay(d.data())) {
+      winSet.add(d.id)
+      total++
+    }
+  })
+
+  // Walk backward from today (or yesterday if today isn't a win)
+  const cursor = new Date(today + 'T12:00:00Z')
+  if (!winSet.has(today)) cursor.setDate(cursor.getDate() - 1)
+  const walkStart = cursor.toLocaleDateString('en-CA')
+
+  let current = 0
+  while (winSet.has(cursor.toLocaleDateString('en-CA'))) {
+    current++
+    cursor.setDate(cursor.getDate() - 1)
+  }
+
+  const lastWinDate = current > 0 ? walkStart : ''
+
+  // Preserve existing best
+  const streakRef = db.doc(`streak/${uid}`)
+  const streakSnap = await streakRef.get()
+  const existingBest = streakSnap.exists ? (streakSnap.data().best || 0) : 0
+  const best = Math.max(existingBest, current)
+
+  await streakRef.set({ current, total, best, lastWinDate })
+
+  const userSnap = await db.doc(`users/${uid}`).get()
+  const userData = userSnap.exists ? userSnap.data() : {}
+  await db.doc(`leaderboard/${uid}`).set({
+    uid,
+    username: userData.username || '',
+    photoURL: userData.photoURL || '',
+    current, total, best,
+    updatedAt: Date.now(),
+  })
+
+  console.log(`Streak recalculated for uid ${uid}: current=${current}, total=${total}, best=${best}`)
+}
+
 // ── DAILY ROLLOVER FOR ONE USER ───────────────────────────
 async function runDailyRollover(uid, today, yesterday) {
   const rolloverRef = db.doc(`meta/${uid}/rollover/data`)
@@ -90,6 +138,10 @@ async function runDailyRollover(uid, today, yesterday) {
   }
 
   await rolloverRef.set({ ...meta, lastRollover: today })
+
+  // Recalculate streak now that yesterday is archived and wins are settled
+  await recalculateStreakForUser(uid, today)
+
   console.log(`Rollover complete for uid: ${uid}`)
 }
 
