@@ -848,7 +848,7 @@ Note: routine hygiene tasks (shower, eat, etc.) should NOT count as wins and sho
 For taskMap, assign each task to "physical", "mental", "spiritual", or null.
 
 Respond ONLY with valid JSON, no other text:
-{"physical": true or false, "mental": true or false, "spiritual": true or false, "reasoning": "one or two sentence explanation", "taskMap": {"task text": "physical"|"mental"|"spiritual"|null}}`
+{"physical": true or false, "mental": true or false, "spiritual": true or false, "reasoningPhysical": "one sentence specific to this user's physical win result, referencing the actual task(s)", "reasoningMental": "one sentence specific to this user's mental win result, referencing the actual task(s)", "reasoningSpiritual": "one sentence specific to this user's spiritual win result, referencing the actual task(s)", "taskMap": {"task text": "physical"|"mental"|"spiritual"|null}}`
 
     try {
       const { data: result } = await evaluateWinFn({ prompt, type: 'today', date: todayStr() })
@@ -858,7 +858,9 @@ Respond ONLY with valid JSON, no other text:
         physical: result.physical,
         mental: result.mental,
         spiritual: result.spiritual,
-        reasoning: result.reasoning || '',
+        reasoningPhysical: result.reasoningPhysical || result.reasoning || '',
+        reasoningMental: result.reasoningMental || result.reasoning || '',
+        reasoningSpiritual: result.reasoningSpiritual || result.reasoning || '',
         taskMap: result.taskMap || {},
         evaluatedAt: Date.now(),
         overridePhysical: todayWins?.overridePhysical ?? null,
@@ -1228,7 +1230,7 @@ Note: routine hygiene tasks (shower, eat, etc.) should NOT count as wins and sho
 For taskMap, assign each task to "physical", "mental", "spiritual", or null.
 
 Respond ONLY with valid JSON, no other text:
-{"physical": true or false, "mental": true or false, "spiritual": true or false, "reasoning": "one or two sentence explanation", "taskMap": {"task text": "physical"|"mental"|"spiritual"|null}}`
+{"physical": true or false, "mental": true or false, "spiritual": true or false, "reasoningPhysical": "one sentence specific to this user's physical win result, referencing the actual task(s)", "reasoningMental": "one sentence specific to this user's mental win result, referencing the actual task(s)", "reasoningSpiritual": "one sentence specific to this user's spiritual win result, referencing the actual task(s)", "taskMap": {"task text": "physical"|"mental"|"spiritual"|null}}`
 
     try {
       const { data: result } = await evaluateWinFn({ prompt, type: 'archive', date })
@@ -1238,7 +1240,9 @@ Respond ONLY with valid JSON, no other text:
         physical: result.physical,
         mental: result.mental,
         spiritual: result.spiritual,
-        reasoning: result.reasoning || '',
+        reasoningPhysical: result.reasoningPhysical || result.reasoning || '',
+        reasoningMental: result.reasoningMental || result.reasoning || '',
+        reasoningSpiritual: result.reasoningSpiritual || result.reasoning || '',
         taskMap: result.taskMap || {},
         evaluatedAt: Date.now(),
         overridePhysical: null,

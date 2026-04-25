@@ -658,6 +658,8 @@ body {
   border-radius: 10px;
   margin-left: 0.3rem;
   vertical-align: middle;
+  display: inline-block;
+  text-decoration: none;
 }
 
 .carried-tag { background: rgba(251,191,36,0.15); color: rgba(251,191,36,0.7); }

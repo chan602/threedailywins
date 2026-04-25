@@ -312,9 +312,8 @@ export default function TodayTab({
               const isOverrideOpen = overrideOpen[type]
               const labels = { physical: 'Physical', mental: 'Mental', spiritual: 'Spiritual' }
 
-              const fullReasoning = todayWins?.reasoning || ''
-              const sentences = fullReasoning.split('. ')
-              const relevantLine = sentences.find(s => s.toLowerCase().includes(type)) || fullReasoning
+              const reasoningKey = `reasoning${type.charAt(0).toUpperCase() + type.slice(1)}`
+              const relevantLine = todayWins?.[reasoningKey] || todayWins?.reasoning || ''
 
               const def = userProfile?.winsDefinition?.[type] || ''
               const iconState = effective === true ? 'achieved' : 'missed'

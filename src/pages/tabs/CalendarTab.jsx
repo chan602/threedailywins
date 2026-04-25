@@ -214,13 +214,14 @@ function FutureDayPanel({ date, tasks, addFutureTask, updateFutureTask, deleteFu
                 <>
                   <button
                     className="profile-cancel-btn"
-                    style={{ padding: '0.15rem 0.4rem', fontSize: '0.72rem', marginLeft: '0.3rem', flexShrink: 0 }}
+                    style={{ padding: '0.15rem 0.5rem', fontSize: '0.72rem', marginLeft: '0.3rem', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                     title="Set repeat"
                     onClick={() => setRepeatingId(repeatingId === t.id ? null : t.id)}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
                     </svg>
+                    Repeat
                   </button>
                   <button className="delete-btn" onClick={() => deleteFutureTask(date, t.id)}>×</button>
                 </>

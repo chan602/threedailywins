@@ -31,6 +31,7 @@ export default function FriendsTab({
   const [challengeDest, setChallengeDest] = useState('today') // 'today' | 'weekly'
   const [challengeSending, setChallengeSending] = useState(false)
   const [challengeSent, setChallengeSent] = useState({})    // { [uid]: true }
+  const [confirmRemoveUid, setConfirmRemoveUid] = useState(null) // uid awaiting remove confirmation
 
   async function handleChallenge(friend) {
     if (!challengeText.trim() || challengeSending) return
@@ -222,7 +223,23 @@ export default function FriendsTab({
                     )}
                   </button>
                 )}
-                <button className="friends-remove-btn" onClick={() => removeFriend(f.uid)}>Remove</button>
+                {confirmRemoveUid === f.uid ? (
+                  <>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Remove?</span>
+                    <button
+                      className="friends-decline-btn"
+                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
+                      onClick={() => { removeFriend(f.uid); setConfirmRemoveUid(null) }}
+                    >Yes</button>
+                    <button
+                      className="profile-cancel-btn"
+                      style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
+                      onClick={() => setConfirmRemoveUid(null)}
+                    >Cancel</button>
+                  </>
+                ) : (
+                  <button className="friends-remove-btn" onClick={() => setConfirmRemoveUid(f.uid)}>Remove</button>
+                )}
               </div>
               {challengeOpen === f.uid && (
                 <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.25rem' }}>
