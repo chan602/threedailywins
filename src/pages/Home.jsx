@@ -1393,10 +1393,14 @@ Respond ONLY with valid JSON, no other text:
       return
     }
 
+    // Fetch current user's username fresh before writing the request
+    const mySnap = await getDoc(doc(db, 'users', uid))
+    const myUsername = mySnap.exists() ? (mySnap.data().username || '') : (userProfile?.username || '')
+
     // Send request — write to their incoming subcollection
     await setDoc(doc(db, 'friendRequests', targetUid, 'incoming', uid), {
       uid,
-      username: userProfile?.username || '',
+      username: myUsername,
       photoURL: user?.photoURL || '',
       sentAt: Date.now()
     })
@@ -1404,6 +1408,11 @@ Respond ONLY with valid JSON, no other text:
   }
 
   async function acceptRequest(senderUid, senderUsername, senderPhotoURL) {
+    // Fetch current user's username fresh — don't trust potentially stale userProfile state
+    const mySnap = await getDoc(doc(db, 'users', uid))
+    const myUsername = mySnap.exists() ? (mySnap.data().username || '') : (userProfile?.username || '')
+    const myPhotoURL = user?.photoURL || ''
+
     // Write to both friends lists
     await setDoc(doc(db, 'friends', uid, 'list', senderUid), {
       uid: senderUid,
@@ -1413,8 +1422,8 @@ Respond ONLY with valid JSON, no other text:
     })
     await setDoc(doc(db, 'friends', senderUid, 'list', uid), {
       uid,
-      username: userProfile?.username || '',
-      photoURL: user?.photoURL || '',
+      username: myUsername,
+      photoURL: myPhotoURL,
       since: Date.now()
     })
     // Remove the request
