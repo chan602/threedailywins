@@ -23,6 +23,7 @@ function Onboarding() {
   const [spiritual, setSpritual] = useState('')
   const [error, setError] = useState('')
   const [checking, setChecking] = useState(false)
+  const [finishing, setFinishing] = useState(false)
   const navigate = useNavigate()
 
   const handleUsernameSubmit = async () => {
@@ -67,26 +68,39 @@ function Onboarding() {
   }
 
   const handleFinish = async (useDefaults) => {
+    if (finishing) return
     const user = auth.currentUser
-    await setDoc(doc(db, 'users', user.uid), {
-      uid: user.uid,
-      username: username.trim().toLowerCase(),
-      displayName: user.displayName,
-      email: user.email,
-      photoURL: user.photoURL,
-      winsDefinition: {
-        physical: useDefaults ? 'Any meaningful physical activity — climbing, gym, run, MMA, workout, sports.' : physical,
-        mental: useDefaults ? 'Academic, professional, or goal-directed work — studying, researching, building, solving.' : mental,
-        spiritual: useDefaults ? 'Broad and personal — journaling, meditation, prayer, sleeping 9+ hrs, meaningful conversation, reflection.' : spiritual,
-      },
-      visibility: {
-        todo: 'friends',
-        archive: 'friends',
-        stats: 'public'
-      },
-      createdAt: Date.now()
-    })
-    navigate('/home')
+    if (!user) {
+      setError('Session expired — please sign in again.')
+      navigate('/login')
+      return
+    }
+    setFinishing(true)
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        username: username.trim().toLowerCase(),
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        winsDefinition: {
+          physical: useDefaults ? 'Any meaningful physical activity — climbing, gym, run, MMA, workout, sports.' : physical,
+          mental: useDefaults ? 'Academic, professional, or goal-directed work — studying, researching, building, solving.' : mental,
+          spiritual: useDefaults ? 'Broad and personal — journaling, meditation, prayer, sleeping 9+ hrs, meaningful conversation, reflection.' : spiritual,
+        },
+        visibility: {
+          todo: 'friends',
+          archive: 'friends',
+          stats: 'public'
+        },
+        createdAt: Date.now()
+      })
+      navigate('/home/today')
+    } catch (e) {
+      console.error('handleFinish error:', e)
+      setError('Something went wrong saving your profile — please try again.')
+      setFinishing(false)
+    }
   }
 
   return (
@@ -124,11 +138,11 @@ function Onboarding() {
               <label>Spiritual win</label>
               <input className="text-input" type="text" placeholder="e.g. Journal, meditate, sleep early" value={spiritual} onChange={e => setSpritual(e.target.value)} />
             </div>
-            <button className="google-btn" onClick={() => handleFinish(false)}>
-              Save my definitions
+            <button className="google-btn" onClick={() => handleFinish(false)} disabled={finishing}>
+              {finishing ? 'Saving…' : 'Save my definitions'}
             </button>
-            <button className="skip-btn" onClick={() => handleFinish(true)}>
-              Skip — use defaults
+            <button className="skip-btn" onClick={() => handleFinish(true)} disabled={finishing}>
+              {finishing ? '…' : 'Skip — use defaults'}
             </button>
           </>
         )}

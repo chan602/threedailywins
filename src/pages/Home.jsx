@@ -543,17 +543,14 @@ function Home({ isGuest = false }) {
       const weeks = weeksSnap.docs.map(d => d.data()).sort((a, b) => b.weekKey.localeCompare(a.weekKey))
       setArchiveWeeks(weeks)
 
-      // Load wins for all days
+      // Load all wins in two bulk fetches instead of one-per-day
       const cache = {}
-      for (const day of days) {
-        const wSnap = await getDoc(doc(db, 'wins', uid, 'days', day.date))
-        if (wSnap.exists()) cache[day.date] = wSnap.data()
-      }
-      // Load wins for all weeks
-      for (const week of weeks) {
-        const wSnap = await getDoc(doc(db, 'wins', uid, 'weeks', week.weekKey))
-        if (wSnap.exists()) cache['week-' + week.weekKey] = wSnap.data()
-      }
+      const [dayWinsSnap, weekWinsSnap] = await Promise.all([
+        getDocs(collection(db, 'wins', uid, 'days')),
+        getDocs(collection(db, 'wins', uid, 'weeks')),
+      ])
+      dayWinsSnap.forEach(d => { cache[d.id] = d.data() })
+      weekWinsSnap.forEach(d => { cache['week-' + d.id] = d.data() })
       setWinsCache(cache)
     } catch (e) {
       console.error('loadArchive error:', e)
