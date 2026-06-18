@@ -309,13 +309,13 @@ function Home({ isGuest = false }) {
       await deleteDoc(doc(db, 'tasks', uid, 'tomorrow', today))
     }
 
-    // Weekly rollover on Monday
-    const dayOfWeek = new Date().getDay()
-    if (dayOfWeek === 1 && meta.lastWeekRollover !== weekKey()) {
+    // Weekly rollover — runs whenever a new week is detected, not just on Monday
+    if (meta.lastWeekRollover !== weekKey()) {
       await weeklyRollover(meta)
     }
 
-    await setDoc(rolloverRef, { ...meta, lastRollover: today })
+    // Use merge so lastWeekRollover set by weeklyRollover above is not overwritten
+    await setDoc(rolloverRef, { lastRollover: today }, { merge: true })
     setRolloverDone(true)
   }
 
@@ -339,7 +339,7 @@ function Home({ isGuest = false }) {
         weekKey: prevKey,
         weekStart: prevMon.toLocaleDateString('en-CA'),
         wTasks, dTasks,
-        summary: `${wDone}/${wTasks.length} weekly goals`,
+        summary: `${wDone}/${wTasks.length} weekly tasks`,
         archivedAt: Date.now()
       })
     }

@@ -131,13 +131,13 @@ async function runDailyRollover(uid, today, yesterday) {
   const merged = allTasks.filter(t => seen.has(t.id) ? false : seen.add(t.id))
   await todayRef.set({ tasks: merged, date: today })
 
-  // Weekly rollover on Monday
-  const nowLA = new Date(new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' }))
-  if (nowLA.getDay() === 1 && meta.lastWeekRollover !== weekKeyFor(new Date())) {
+  // Weekly rollover — runs whenever a new week is detected, not just on Monday
+  if (meta.lastWeekRollover !== weekKeyFor(new Date())) {
     await runWeeklyRollover(uid, meta)
   }
 
-  await rolloverRef.set({ ...meta, lastRollover: today })
+  // Use merge so lastWeekRollover set by runWeeklyRollover above is not overwritten
+  await rolloverRef.set({ lastRollover: today }, { merge: true })
 
   // Recalculate streak now that yesterday is archived and wins are settled
   await recalculateStreakForUser(uid, today)
@@ -169,7 +169,7 @@ async function runWeeklyRollover(uid, meta) {
       weekKey: prevKey,
       weekStart: prevMon.toLocaleDateString('en-CA'),
       wTasks, dTasks,
-      summary: `${wDone}/${wTasks.length} weekly goals`,
+      summary: `${wDone}/${wTasks.length} weekly tasks`,
       archivedAt: Date.now()
     })
   }

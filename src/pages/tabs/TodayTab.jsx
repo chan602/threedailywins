@@ -407,7 +407,7 @@ export default function TodayTab({
         <div>
           <p className="week-range">{weekRangeLabel()}</p>
 
-          <p className="section-label">Weekly goals</p>
+          <p className="section-label">Weekly tasks</p>
           <div className="add-row">
             <input
               className="task-input"
