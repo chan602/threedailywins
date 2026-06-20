@@ -131,9 +131,14 @@ async function runDailyRollover(uid, today, yesterday) {
   const merged = allTasks.filter(t => seen.has(t.id) ? false : seen.add(t.id))
   await todayRef.set({ tasks: merged, date: today })
 
-  // Weekly rollover — runs whenever a new week is detected, not just on Monday
+  // Delete consumed tomorrow doc so it doesn't linger in Firestore
+  if (tmrwSnap.exists) {
+    await db.doc(`tasks/${uid}/tomorrow/${today}`).delete()
+  }
+
+  // Weekly rollover — runs whenever a new week is detected
   if (meta.lastWeekRollover !== weekKeyFor(new Date())) {
-    await runWeeklyRollover(uid, meta)
+    await runWeeklyRollover(uid)
   }
 
   // Use merge so lastWeekRollover set by runWeeklyRollover above is not overwritten
@@ -146,7 +151,7 @@ async function runDailyRollover(uid, today, yesterday) {
 }
 
 // ── WEEKLY ROLLOVER FOR ONE USER ─────────────────────────
-async function runWeeklyRollover(uid, meta) {
+async function runWeeklyRollover(uid) {
   const now = new Date()
   const prevWeek = new Date(now); prevWeek.setDate(now.getDate() - 7)
   const prevDay = prevWeek.getDay()
@@ -174,14 +179,17 @@ async function runWeeklyRollover(uid, meta) {
     })
   }
 
-  // Carry unfinished weekly goals forward
+  // Carry unfinished weekly tasks forward
   if (prevSnap.exists) {
     const unfinished = wTasks.filter(t => !t.done)
       .map(t => ({ ...t, carried: true, carryCount: (t.carryCount || 0) + 1 }))
     const thisSnap = await db.doc(`tasks/${uid}/weekly/${currentKey}`).get()
     const current = thisSnap.exists ? (thisSnap.data().tasks || []) : []
+    // Dedup by ID — prevents double-carry if rollover runs more than once
+    const currentIds = new Set(current.map(t => t.id))
+    const toCarry = unfinished.filter(t => !currentIds.has(t.id))
     await db.doc(`tasks/${uid}/weekly/${currentKey}`).set({
-      tasks: [...unfinished, ...current],
+      tasks: [...toCarry, ...current],
       weekKey: currentKey
     })
   }
@@ -217,7 +225,7 @@ async function runWeeklyRollover(uid, meta) {
   })
 
   await db.doc(`meta/${uid}/rollover/data`).set(
-    { ...meta, lastWeekRollover: currentKey },
+    { lastWeekRollover: currentKey },
     { merge: true }
   )
 }
@@ -304,14 +312,16 @@ exports.evaluateWin = onCall(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 400,
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
     if (!response.ok) {
-      throw new HttpsError("internal", "Anthropic API call failed.");
+      const errBody = await response.text().catch(() => "(unreadable)");
+      console.error(`Anthropic API error ${response.status}:`, errBody);
+      throw new HttpsError("internal", `Anthropic API call failed (${response.status}).`);
     }
 
     const data = await response.json();

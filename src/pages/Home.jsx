@@ -311,7 +311,7 @@ function Home({ isGuest = false }) {
 
     // Weekly rollover — runs whenever a new week is detected, not just on Monday
     if (meta.lastWeekRollover !== weekKey()) {
-      await weeklyRollover(meta)
+      await weeklyRollover()
     }
 
     // Use merge so lastWeekRollover set by weeklyRollover above is not overwritten
@@ -319,7 +319,7 @@ function Home({ isGuest = false }) {
     setRolloverDone(true)
   }
 
-  async function weeklyRollover(meta) {
+  async function weeklyRollover() {
     const prevWeek = new Date(); prevWeek.setDate(prevWeek.getDate() - 7)
     const prevDay = prevWeek.getDay()
     const diff = prevDay === 0 ? -6 : 1 - prevDay
@@ -349,7 +349,10 @@ function Home({ isGuest = false }) {
         .map(t => ({ ...t, carried: true, carryCount: (t.carryCount || 0) + 1 }))
       const thisSnap = await getDoc(weekRef)
       const current = thisSnap.exists() ? (thisSnap.data().tasks || []) : []
-      await setDoc(weekRef, { tasks: [...unfinished, ...current], weekKey: weekKey() })
+      // Dedup by ID — prevents double-carry if rollover runs more than once
+      const currentIds = new Set(current.map(t => t.id))
+      const toCarry = unfinished.filter(t => !currentIds.has(t.id))
+      await setDoc(weekRef, { tasks: [...toCarry, ...current], weekKey: weekKey() })
     }
 
     const newDTasks = dTasks.map(t => ({ ...t, count: 0 }))
@@ -385,7 +388,8 @@ function Home({ isGuest = false }) {
       calculatedAt: Date.now()
     })
 
-    await setDoc(rolloverRef, { ...meta, lastWeekRollover: weekKey() })
+    // Use merge to preserve lastRollover and any other fields already in the doc
+    await setDoc(rolloverRef, { lastWeekRollover: weekKey() }, { merge: true })
   }
 
   // ── LISTENERS ─────────────────────────────────────────

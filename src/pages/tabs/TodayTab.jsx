@@ -411,7 +411,7 @@ export default function TodayTab({
           <div className="add-row">
             <input
               className="task-input"
-              placeholder="Add weekly goal..."
+              placeholder="Add weekly task..."
               value={weeklyInput}
               onChange={e => setWeeklyInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addTask()}
@@ -430,7 +430,7 @@ export default function TodayTab({
             toggleTask={toggleTask}
             deleteTask={deleteTask}
             reorderTask={reorderTask}
-            autoSortCompleted={false}
+            autoSortCompleted={autoSortCompleted}
           />
 
           <p className="section-label" style={{ marginTop: '1.5rem' }}>Daily habits</p>
