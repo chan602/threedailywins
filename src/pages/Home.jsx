@@ -275,38 +275,43 @@ function Home({ isGuest = false }) {
     const yStr = yesterday.toLocaleDateString('en-CA')
     const ySnap = await getDoc(todayRef)
 
-    // Archive yesterday
-    if (ySnap.exists() && (ySnap.data().tasks || []).length > 0) {
-      const yTasks = ySnap.data().tasks
-      const done = yTasks.filter(t => t.done).length
-      await setDoc(doc(db, 'archive', uid, 'days', yStr), {
-        date: yStr, tasks: yTasks,
-        summary: `${done}/${yTasks.length} completed`,
-        archivedAt: Date.now()
-      })
-    }
+    // Guard: if today's doc already has today's date, it was written by the CF or a
+    // previous rollover on another device. Skip archive/carry to avoid wiping live tasks.
+    const todayDocDate = ySnap.exists() ? ySnap.data().date : null
+    if (todayDocDate !== today) {
+      // Archive yesterday
+      if (ySnap.exists() && (ySnap.data().tasks || []).length > 0) {
+        const yTasks = ySnap.data().tasks
+        const done = yTasks.filter(t => t.done).length
+        await setDoc(doc(db, 'archive', uid, 'days', yStr), {
+          date: yStr, tasks: yTasks,
+          summary: `${done}/${yTasks.length} completed`,
+          archivedAt: Date.now()
+        })
+      }
 
-    // Carry over unfinished tasks
-    const existingToday = ySnap.exists() ? (ySnap.data().tasks || []) : []
-    const carryOver = existingToday
-      .filter(t => !t.done)
-      .map(t => ({ ...t, carried: true, carryCount: (t.carryCount || 0) + 1 }))
+      // Carry over unfinished tasks
+      const existingToday = ySnap.exists() ? (ySnap.data().tasks || []) : []
+      const carryOver = existingToday
+        .filter(t => !t.done)
+        .map(t => ({ ...t, carried: true, carryCount: (t.carryCount || 0) + 1 }))
 
-    // Pull tomorrow queue
-    const tmrwSnap = await getDoc(doc(db, 'tasks', uid, 'tomorrow', today))
-    const fromTmrw = tmrwSnap.exists()
-      ? (tmrwSnap.data().tasks || []).map(t => ({ ...t, carried: false, carryCount: 0 }))
-      : []
+      // Pull tomorrow queue
+      const tmrwSnap = await getDoc(doc(db, 'tasks', uid, 'tomorrow', today))
+      const fromTmrw = tmrwSnap.exists()
+        ? (tmrwSnap.data().tasks || []).map(t => ({ ...t, carried: false, carryCount: 0 }))
+        : []
 
-    // Merge and dedup
-    const allTasks = [...carryOver, ...fromTmrw]
-    const seen = new Set()
-    const merged = allTasks.filter(t => seen.has(t.id) ? false : seen.add(t.id))
-    await setDoc(todayRef, { tasks: merged, date: today })
+      // Merge and dedup
+      const allTasks = [...carryOver, ...fromTmrw]
+      const seen = new Set()
+      const merged = allTasks.filter(t => seen.has(t.id) ? false : seen.add(t.id))
+      await setDoc(todayRef, { tasks: merged, date: today })
 
-    // Delete the old tomorrow doc so it can't bleed into the tomorrow queue
-    if (tmrwSnap.exists()) {
-      await deleteDoc(doc(db, 'tasks', uid, 'tomorrow', today))
+      // Delete the old tomorrow doc so it can't bleed into the tomorrow queue
+      if (tmrwSnap.exists()) {
+        await deleteDoc(doc(db, 'tasks', uid, 'tomorrow', today))
+      }
     }
 
     // Weekly rollover — runs whenever a new week is detected, not just on Monday
@@ -751,8 +756,10 @@ function Home({ isGuest = false }) {
       if (isGuest) { setTomorrowTasks(updated); return }
       await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
     } else if (type === 'weekly') {
-      const updated = weeklyTasks.map(t => t.id === id ? { ...t, done: !t.done } : t)
-      if (isGuest) { setWeeklyTasks(updated); return }
+      // Functional updater — always operates on latest state, avoids stale closure bug
+      let updated
+      setWeeklyTasks(prev => { updated = prev.map(t => t.id === id ? { ...t, done: !t.done } : t); return updated })
+      if (isGuest) return
       await setDoc(weekRef, { tasks: updated, weekKey: weekKey() })
     }
   }
@@ -768,8 +775,10 @@ function Home({ isGuest = false }) {
       setTomorrowTasks(updated)
       await setDoc(tmrwRef, { tasks: updated, date: tomorrowStr() })
     } else if (type === 'weekly') {
-      const updated = weeklyTasks.filter(t => t.id !== id)
-      if (isGuest) { setWeeklyTasks(updated); return }
+      // Functional updater — always operates on latest state, avoids stale closure bug
+      let updated
+      setWeeklyTasks(prev => { updated = prev.filter(t => t.id !== id); return updated })
+      if (isGuest) return
       await setDoc(weekRef, { tasks: updated, weekKey: weekKey() })
     }
   }

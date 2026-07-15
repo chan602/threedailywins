@@ -101,39 +101,44 @@ async function runDailyRollover(uid, today, yesterday) {
   const todayRef = db.doc(`tasks/${uid}/today/data`)
   const ySnap = await todayRef.get()
 
-  // Archive yesterday's tasks
-  if (ySnap.exists && (ySnap.data().tasks || []).length > 0) {
-    const yTasks = ySnap.data().tasks
-    const done = yTasks.filter(t => t.done).length
-    await db.doc(`archive/${uid}/days/${yesterday}`).set({
-      date: yesterday,
-      tasks: yTasks,
-      summary: `${done}/${yTasks.length} completed`,
-      archivedAt: Date.now()
-    })
-  }
+  // Guard: if today's doc already has today's date, it was written by the client or a
+  // previous rollover run. Skip archive/carry to avoid wiping live tasks.
+  const todayDocDate = ySnap.exists ? ySnap.data().date : null
+  if (todayDocDate !== today) {
+    // Archive yesterday's tasks
+    if (ySnap.exists && (ySnap.data().tasks || []).length > 0) {
+      const yTasks = ySnap.data().tasks
+      const done = yTasks.filter(t => t.done).length
+      await db.doc(`archive/${uid}/days/${yesterday}`).set({
+        date: yesterday,
+        tasks: yTasks,
+        summary: `${done}/${yTasks.length} completed`,
+        archivedAt: Date.now()
+      })
+    }
 
-  // Carry over unfinished tasks
-  const existingToday = ySnap.exists ? (ySnap.data().tasks || []) : []
-  const carryOver = existingToday
-    .filter(t => !t.done)
-    .map(t => ({ ...t, carried: true, carryCount: (t.carryCount || 0) + 1 }))
+    // Carry over unfinished tasks
+    const existingToday = ySnap.exists ? (ySnap.data().tasks || []) : []
+    const carryOver = existingToday
+      .filter(t => !t.done)
+      .map(t => ({ ...t, carried: true, carryCount: (t.carryCount || 0) + 1 }))
 
-  // Pull tomorrow queue into today
-  const tmrwSnap = await db.doc(`tasks/${uid}/tomorrow/${today}`).get()
-  const fromTmrw = tmrwSnap.exists
-    ? (tmrwSnap.data().tasks || []).map(t => ({ ...t, carried: false, carryCount: 0 }))
-    : []
+    // Pull tomorrow queue into today
+    const tmrwSnap = await db.doc(`tasks/${uid}/tomorrow/${today}`).get()
+    const fromTmrw = tmrwSnap.exists
+      ? (tmrwSnap.data().tasks || []).map(t => ({ ...t, carried: false, carryCount: 0 }))
+      : []
 
-  // Merge and dedup by id
-  const allTasks = [...carryOver, ...fromTmrw]
-  const seen = new Set()
-  const merged = allTasks.filter(t => seen.has(t.id) ? false : seen.add(t.id))
-  await todayRef.set({ tasks: merged, date: today })
+    // Merge and dedup by id
+    const allTasks = [...carryOver, ...fromTmrw]
+    const seen = new Set()
+    const merged = allTasks.filter(t => seen.has(t.id) ? false : seen.add(t.id))
+    await todayRef.set({ tasks: merged, date: today })
 
-  // Delete consumed tomorrow doc so it doesn't linger in Firestore
-  if (tmrwSnap.exists) {
-    await db.doc(`tasks/${uid}/tomorrow/${today}`).delete()
+    // Delete consumed tomorrow doc so it doesn't linger in Firestore
+    if (tmrwSnap.exists) {
+      await db.doc(`tasks/${uid}/tomorrow/${today}`).delete()
+    }
   }
 
   // Weekly rollover — runs whenever a new week is detected
